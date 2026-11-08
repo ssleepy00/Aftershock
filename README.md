@@ -2,6 +2,8 @@
 
 **Aftershock** is an institutional-grade physical climate risk analytics engine that evaluates equity portfolios against facility-level natural disaster exposure (hurricanes, earthquakes, and co-located infrastructure failure). It models corporate exposure across critical infrastructure assets—including data centers, power supply substations, corporate headquarters, and wafer fabrication facilities—using open federal and research data (FEMA National Risk Index, USGS National Seismic Hazard Model, NOAA HURDAT2, Epoch AI, PNNL, EIA-860, and SEC Form 10-K).
 
+# URL
+https://aftershock.ai.studio
 ---
 
 ## Prerequisites
