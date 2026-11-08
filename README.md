@@ -110,10 +110,18 @@ In production mode:
 
 ---
 
-## Architecture Overview
+## Architecture & Design Documentation
 
-- `server.ts`: Express backend handling API requests, file uploads, and Vite middleware / static asset serving.
-- `src/App.tsx`: Main layout with cracked-circle logo, navigation tabs, and portfolio score badge.
+For complete mathematical definitions, architectural design, and data provenance, see **[Design.md](./Design.md)**.
+
+- `Design.md`: Comprehensive system specification, guardrails, and data provenance.
+- `server.ts`: Express 4 backend handling multimodal Gemini Vision API extractions, static production serving, and source auditing.
+- `src/config/appConfig.ts`: Centralized application constants, AI models, and financial risk guardrails.
+- `src/utils/logger.ts`: Centralized telemetry logging all function calls and sanitized GenAI requests.
+- `src/features/portfolio/`: Modular domain engines for parsing (`portfolioParser.ts`), stock database (`stockDatabase.ts`), optimization (`portfolioOptimizer.ts`), and risk metrics (`metricsCalculator.ts`).
+- `src/features/export/`: Modular exporters for Markdown (`markdownExporter.ts`), CSV (`csvExporter.ts`), JSON (`jsonExporter.ts`), and browser downloads (`fileDownloader.ts`).
 - `src/components/PortfolioUploadTab.tsx`: Portfolio dropzone, donut visualization, exposure score breakdown, and current vs. risk-hedged comparison.
 - `src/components/USInfrastructureMapTab.tsx`: Interactive SVG map of US data centers, power supply, HQs, and wafer fabs with hazard overlays.
-- `src/data/aftershockData.ts`: Deterministic calculation engine for exposure scores, risk-hedging optimization, turnover constraints, and facility database.
+- `src/components/PortfolioExportModal.tsx`: Multi-format export dialog with instant copy and file download.
+- `src/data/aftershockData.ts`: Central re-export hub ensuring backward compatibility for internal imports and automated test runners.
+

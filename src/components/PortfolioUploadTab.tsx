@@ -1,10 +1,31 @@
+/**
+ * Portfolio Upload & Risk Overview Feature Component
+ *
+ * This feature component powers the primary portfolio ingestion and physical climate risk
+ * assessment workflow in Aftershock.
+ *
+ * Feature Overview & Use Cases:
+ * 1. Multimodal Portfolio Ingestion: Provides a drag-and-drop zone supporting brokerage
+ *    screenshots (PNG/JPG), pie charts, CSV files, and plain text tables.
+ * 2. Rapid Preset Evaluation: Offers one-click institutional presets (AI & Cloud Leaders,
+ *    Coastal Grid & Data REITs, Fault-Line Hardware & Fabs) for instant exploration.
+ * 3. Side-by-Side Executive Metrics: Displays current vs. risk-hedged performance cards
+ *    (Exposure Score, Unpriced Risk Drag, Sharpe/Sortino ratios, Max Event Drawdowns).
+ * 4. Interactive Donut Chart & Holdings Roster: Renders dynamic SVG allocation donuts and
+ *    per-holding physical risk breakdowns with one-click transitions to the geographic map.
+ * 5. Constrained Risk Hedging Toggle: Toggles between baseline and defensively rebalanced
+ *    portfolio states honoring institutional turnover and delta caps.
+ */
+
 import React, { useState, useRef, useMemo } from 'react';
 import {
   StockRiskProfile,
   PORTFOLIO_PRESETS,
   buildPortfolioProfiles,
   computePortfolioMetrics,
+  verifyPortfolioGuardrails,
 } from '../data/aftershockData';
+import { logFunctionCall } from '../utils/logger';
 import {
   Upload,
   Sparkles,
@@ -16,9 +37,11 @@ import {
   TrendingUp,
   Shield,
   Info,
+  AlertTriangle,
+  ShieldCheck,
 } from 'lucide-react';
 
-interface PortfolioUploadTabProps {
+export interface PortfolioUploadTabProps {
   portfolioName: string;
   setPortfolioName: (name: string) => void;
   profiles: StockRiskProfile[];
@@ -28,6 +51,12 @@ interface PortfolioUploadTabProps {
   onGoToMap: (selectedTicker?: string) => void;
 }
 
+/**
+ * Portfolio Upload & Assessment Tab Component.
+ *
+ * @param props Component properties containing portfolio state, setters, and map navigation handler.
+ * @returns React element rendering upload dropzone, metrics summary, and holdings list.
+ */
 export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
   portfolioName,
   setPortfolioName,
@@ -40,6 +69,8 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedPreviewUrl, setUploadedPreviewUrl] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isHumanApproved, setIsHumanApproved] = useState<boolean>(false);
   const [activePresetId, setActivePresetId] = useState<string>('ai-cloud');
   const [showScoreTooltip, setShowScoreTooltip] = useState(false);
   const [pinnedScoreTooltip, setPinnedScoreTooltip] = useState(false);
@@ -52,6 +83,10 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
   );
 
   const metrics = useMemo(() => computePortfolioMetrics(sortedProfiles), [sortedProfiles]);
+  const guardrailCheck = useMemo(
+    () => verifyPortfolioGuardrails(sortedProfiles),
+    [sortedProfiles]
+  );
   const activeMetrics = isHedged ? metrics.hedged : metrics.current;
   const totalSites = sortedProfiles.reduce((sum, p) => sum + p.sites.length, 0);
 
@@ -70,8 +105,17 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
   const scoreImprovement =
     metrics.current.exposureScore - metrics.hedged.exposureScore;
 
-  const handleFileProcess = async (file: File) => {
+  /**
+   * Processes an uploaded file (screenshot, pie chart image, CSV, or text),
+   * calls the backend vision/parser extraction endpoint, and updates portfolio state.
+   *
+   * @param file User-selected or dropped file object.
+   */
+  const handleFileProcess = async (file: File): Promise<void> => {
+    logFunctionCall('handleFileProcess', { fileName: file.name, fileSize: file.size, fileType: file.type });
     setIsUploading(true);
+    setUploadError(null);
+    setIsHumanApproved(false);
     setActivePresetId('');
 
     try {
@@ -106,31 +150,52 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
       });
 
       const data = await response.json();
+      if (!response.ok || data?.error) {
+        setUploadError(data?.error || 'Failed to extract portfolio from upload.');
+        return;
+      }
       if (data?.items && Array.isArray(data.items) && data.items.length > 0) {
         setPortfolioName(data.portfolioName || file.name.replace(/\.[^/.]+$/, ''));
         setProfiles(buildPortfolioProfiles(data.items));
+      } else {
+        setUploadError('No valid portfolio tickers or weights detected in file.');
       }
     } catch (err) {
       console.error('Upload extraction error:', err);
+      setUploadError('Network error while extracting portfolio upload.');
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  /**
+   * Handles dropping a file onto the upload dropzone.
+   *
+   * @param e Drag event with transferred files.
+   */
+  const handleDrop = (e: React.DragEvent): void => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (file) {
+      logFunctionCall('handleDrop', { fileName: file.name });
       handleFileProcess(file);
     }
   };
 
-  const handleSelectPreset = (presetId: string) => {
+  /**
+   * Selects and loads one of the preconfigured institutional portfolio presets.
+   *
+   * @param presetId Unique identifier of the portfolio preset.
+   */
+  const handleSelectPreset = (presetId: string): void => {
+    logFunctionCall('handleSelectPreset', { presetId });
     const found = PORTFOLIO_PRESETS.find((p) => p.id === presetId);
     if (!found) return;
     setActivePresetId(presetId);
     setUploadedPreviewUrl(null);
+    setUploadError(null);
+    setIsHumanApproved(false);
     setPortfolioName(found.label);
     setProfiles(buildPortfolioProfiles(found.items));
   };
@@ -194,6 +259,7 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
+                  e.currentTarget.value = '';
                   if (file) handleFileProcess(file);
                 }}
               />
@@ -243,6 +309,13 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
                 </>
               )}
             </div>
+
+            {uploadError && (
+              <div className="mt-3 p-3 rounded-2xl bg-[#F25C54]/15 border border-[#F25C54]/40 flex items-start gap-2.5 text-xs text-[#F7F2EB]">
+                <AlertTriangle className="w-4 h-4 text-[#F25C54] shrink-0 mt-0.5" />
+                <span>{uploadError}</span>
+              </div>
+            )}
 
             {/* Instant Sample Presets */}
             <div className="mt-4">
@@ -461,6 +534,52 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Deterministic Guardrail Verification & Human Approval Gate */}
+            {isHedged && (
+              <div className="mt-3 p-3 rounded-2xl bg-[#191410] border border-[#362B22] flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                  <span className="inline-flex items-center gap-1 font-bold text-[#52B788]">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    {guardrailCheck.allChecksPassed
+                      ? 'Guardrails Verified'
+                      : 'Guardrail Check'}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-lg bg-[#241C16] border border-[#382C24] font-mono text-[#D6C7B8]">
+                    Max Δw: {guardrailCheck.maxSingleStockDeltaPts.toFixed(1)}/5.0 pts
+                  </span>
+                  <span className="px-2 py-0.5 rounded-lg bg-[#241C16] border border-[#382C24] font-mono text-[#D6C7B8]">
+                    Turnover: {guardrailCheck.oneWayTurnoverPct.toFixed(1)}%/15.0%
+                  </span>
+                  <span className="px-2 py-0.5 rounded-lg bg-[#241C16] border border-[#382C24] font-mono text-[#D6C7B8]">
+                    Σw: {guardrailCheck.hedgedWeightSumPct.toFixed(1)}%
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => {
+                    logFunctionCall('toggleHumanApprovalGate', {
+                      portfolioName,
+                      approved: !isHumanApproved,
+                      guardrailCheck,
+                    });
+                    setIsHumanApproved((prev) => !prev);
+                  }}
+                  className={`px-3 py-1 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
+                    isHumanApproved
+                      ? 'bg-[#52B788]/20 border-[#52B788] text-[#52B788]'
+                      : 'bg-[#2E241D] border-[#4A3A2F] text-[#F7F2EB] hover:border-[#E57A54]'
+                  }`}
+                >
+                  <Check className="w-3 h-3" />
+                  <span>
+                    {isHumanApproved
+                      ? 'Human Approved · Advisory Only (No Auto-Trade)'
+                      : 'Approve Hedged Proposal (Human Gate)'}
+                  </span>
+                </button>
+              </div>
+            )}
 
             {/* Quantitative Metrics Strip (Normal on Current Weights, New + Difference on Risk-Hedged) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 my-4">

@@ -1,3 +1,22 @@
+/**
+ * Aftershock Main Application Shell
+ *
+ * This is the root presentation and coordination layer for Aftershock, orchestrating
+ * portfolio risk analysis, US physical infrastructure cartography, and multi-format reporting.
+ *
+ * Feature Overview & Use Cases:
+ * 1. Global Navigation & View Switcher: Toggles seamlessly between the Portfolio Risk Assessment
+ *    workspace and the interactive US Infrastructure Map view.
+ * 2. Shared Portfolio State Management: Maintains active equity holdings, hedged allocations,
+ *    and portfolio naming across components and modalities.
+ * 3. Sticky Header Telemetry: Continuously surfaces high-level exposure score (/100) and unpriced
+ *    disaster risk drag (%) in the primary navigation bar.
+ * 4. Multi-Format Export Orchestration: Provides global access to the export modal, allowing
+ *    instant report generation in Markdown, CSV, and JSON.
+ * 5. Deep-Link Navigation: Facilitates seamless transitions from individual portfolio stock cards
+ *    directly to focused facility markers on the US map.
+ */
+
 import React, { useState, useMemo } from 'react';
 import {
   PORTFOLIO_PRESETS,
@@ -7,11 +26,18 @@ import {
 } from './data/aftershockData';
 import { PortfolioUploadTab } from './components/PortfolioUploadTab';
 import { USInfrastructureMapTab } from './components/USInfrastructureMapTab';
-import { SourceCodeModal } from './components/SourceCodeModal';
-import { Code2 } from 'lucide-react';
+import { PortfolioExportModal } from './components/PortfolioExportModal';
+import { logFunctionCall } from './utils/logger';
+import { Download } from 'lucide-react';
 
-type TabId = 'portfolio' | 'map';
+export type TabId = 'portfolio' | 'map';
 
+/**
+ * Root Application Component.
+ * Manages top-level routing, portfolio state, hedging toggles, and modal dialogs.
+ *
+ * @returns Complete application UI view.
+ */
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('portfolio');
   const [portfolioName, setPortfolioName] = useState<string>(
@@ -22,14 +48,40 @@ export default function App() {
   );
   const [isHedged, setIsHedged] = useState<boolean>(false);
   const [focusedTicker, setFocusedTicker] = useState<string | null>(null);
-  const [isSourceOpen, setIsSourceOpen] = useState<boolean>(false);
+  const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
 
   const metrics = useMemo(() => computePortfolioMetrics(profiles), [profiles]);
   const activeSnapshot = isHedged ? metrics.hedged : metrics.current;
 
-  const handleGoToMap = (ticker?: string) => {
+  /**
+   * Switches view to the US Infrastructure Map focused on a designated stock ticker.
+   *
+   * @param ticker Optional stock ticker to spotlight on the map (e.g. NVDA, EQIX).
+   */
+  const handleGoToMap = (ticker?: string): void => {
+    logFunctionCall('handleGoToMap', { ticker: ticker || 'none' });
     setFocusedTicker(ticker || null);
     setActiveTab('map');
+  };
+
+  /**
+   * Switches the active top-level tab between portfolio overview and US map.
+   *
+   * @param tab Target tab identifier.
+   */
+  const handleTabSwitch = (tab: TabId): void => {
+    logFunctionCall('handleTabSwitch', { tab });
+    setActiveTab(tab);
+  };
+
+  /**
+   * Toggles the portfolio export modal dialog.
+   *
+   * @param open Whether the export modal should be displayed.
+   */
+  const handleToggleExport = (open: boolean): void => {
+    logFunctionCall('handleToggleExport', { open });
+    setIsExportOpen(open);
   };
 
   return (
@@ -39,7 +91,7 @@ export default function App() {
         <div className="max-w-[1360px] mx-auto px-6 h-20 flex items-center justify-between gap-8">
           {/* Brand: Cracked Dark Brown Circle Logo + Aftershock */}
           <div
-            onClick={() => setActiveTab('portfolio')}
+            onClick={() => handleTabSwitch('portfolio')}
             className="flex items-center gap-3.5 cursor-pointer select-none"
           >
             {/* Dark Brown Circle Logo with Seismic Crack */}
@@ -76,7 +128,7 @@ export default function App() {
           {/* Bubbly 2-Tab Switcher */}
           <nav className="flex items-center bg-[#221B16] p-1.5 rounded-2xl border border-[#382C24]">
             <button
-              onClick={() => setActiveTab('portfolio')}
+              onClick={() => handleTabSwitch('portfolio')}
               className={`px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'portfolio'
                   ? 'bg-[#E57A54] text-[#16110E] shadow-sm'
@@ -86,7 +138,7 @@ export default function App() {
               Portfolio
             </button>
             <button
-              onClick={() => setActiveTab('map')}
+              onClick={() => handleTabSwitch('map')}
               className={`px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'map'
                   ? 'bg-[#E57A54] text-[#16110E] shadow-sm'
@@ -97,7 +149,7 @@ export default function App() {
             </button>
           </nav>
 
-          {/* Right Zone: Exposure Pill + Source Code Button */}
+          {/* Right Zone: Exposure Pill + Export Button */}
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-3 bg-[#221B16] px-4 py-2 rounded-2xl border border-[#382C24]">
               <div className="flex items-center gap-1.5 pr-3 border-r border-[#382C24]">
@@ -119,11 +171,12 @@ export default function App() {
             </div>
 
             <button
-              onClick={() => setIsSourceOpen(true)}
-              className="px-4 py-2.5 rounded-2xl bg-[#221B16] hover:bg-[#2E241D] border border-[#3E3127] text-xs font-bold text-[#F7F2EB] flex items-center gap-2 transition-colors cursor-pointer"
+              onClick={() => handleToggleExport(true)}
+              className="px-4 py-2.5 rounded-2xl bg-[#E57A54] hover:bg-[#eb8967] text-xs font-bold text-[#16110E] flex items-center gap-1.5 transition-all cursor-pointer shadow-md"
+              title="Export portfolio risk evaluation (Markdown, CSV, JSON)"
             >
-              <Code2 className="w-3.5 h-3.5 text-[#E57A54]" />
-              <span>Source Code</span>
+              <Download className="w-3.5 h-3.5" />
+              <span>Export</span>
             </button>
           </div>
         </div>
@@ -149,9 +202,14 @@ export default function App() {
         )}
       </main>
 
-      <SourceCodeModal
-        isOpen={isSourceOpen}
-        onClose={() => setIsSourceOpen(false)}
+      {/* Portfolio Risk Evaluation Export Modal */}
+      <PortfolioExportModal
+        isOpen={isExportOpen}
+        onClose={() => handleToggleExport(false)}
+        portfolioName={portfolioName}
+        profiles={profiles}
+        metrics={metrics}
+        isHedged={isHedged}
       />
     </div>
   );

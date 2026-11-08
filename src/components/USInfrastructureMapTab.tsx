@@ -1,9 +1,31 @@
+/**
+ * US Physical Infrastructure & Hazard Map Feature Component
+ *
+ * This feature component provides an interactive cartographic visualization of physical
+ * corporate infrastructure across the continental United States, contextualized against
+ * federal earthquake fault lines and hurricane storm surge tracks.
+ *
+ * Feature Overview & Use Cases:
+ * 1. Cartographic Hazard Projection: Projects 38 verified physical facilities across Data Centers,
+ *    Power Supplies, Corporate HQs, and Wafer Fabs onto an SVG map of the continental US.
+ * 2. Visual Collision Disambiguation: Applies deterministic radial offsets to co-located campuses
+ *    (e.g., Silicon Valley or Northern Virginia) to prevent pin occlusion.
+ * 3. Multi-Hazard & Infrastructure Filtering: Enables filtering by natural hazard type (Hurricane,
+ *    Earthquake, or All) and infrastructure category (Data Centers, Power Supply, HQs, Fabs).
+ * 4. Interactive Stock Deep-Dive: Synchronizes selected equities with an interactive facility roster,
+ *    revealing power capacities in MW, local geology, and unpriced risk contributions.
+ * 5. Spatial Risk Overlays: Visualizes the Atlantic/Gulf Hurricane Corridor and California Hayward/San Andreas
+ *    seismic fault belts as transparent atmospheric SVG overlays.
+ */
+
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   StockRiskProfile,
   InfraSite,
   InfraCategory,
 } from '../data/aftershockData';
+import { projectLatLng } from '../utils/spatialProjection';
+import { logFunctionCall } from '../utils/logger';
 import {
   Waves,
   Flame,
@@ -14,40 +36,56 @@ import {
   MapPin,
 } from 'lucide-react';
 
-interface USInfrastructureMapTabProps {
+export interface USInfrastructureMapTabProps {
   profiles: StockRiskProfile[];
   initialSelectedTicker?: string | null;
 }
 
-// Convert US lat/lng (24.5..49.2 N, -125..-66.5 W) to SVG 960x560 coordinates
-function projectLatLng(lat: number, lng: number, offsetIdx = 0): { x: number; y: number } {
-  const minLng = -125.5;
-  const maxLng = -66.5;
-  const minLat = 24.2;
-  const maxLat = 49.5;
-
-  const normX = (lng - minLng) / (maxLng - minLng);
-  const normY = 1 - (lat - minLat) / (maxLat - minLat);
-
-  const angle = offsetIdx * 2.15;
-  const radius = offsetIdx === 0 ? 0 : 14 + (offsetIdx % 2) * 6;
-
-  const x = 65 + normX * 830 + Math.cos(angle) * radius;
-  const y = 45 + normY * 465 + Math.sin(angle) * radius;
-
-  return {
-    x: Math.max(45, Math.min(905, x)),
-    y: Math.max(40, Math.min(515, y)),
-  };
-}
-
-function getCategoryShortCode(cat: InfraCategory): string {
+/**
+ * Returns a concise 2-4 character abbreviation for an infrastructure category.
+ *
+ * @param cat Infrastructure category name (Data Center, Power Supply, Corporate HQ, Wafer Fab).
+ * @returns Short abbreviation string (DC, PWR, HQ, FAB).
+ */
+export function getCategoryShortCode(cat: InfraCategory): string {
+  logFunctionCall('getCategoryShortCode', { cat });
   if (cat === 'Data Center') return 'DC';
   if (cat === 'Power Supply') return 'PWR';
   if (cat === 'Corporate HQ') return 'HQ';
   return 'FAB';
 }
 
+/**
+ * Maps risk severity level to hexadecimal color code.
+ *
+ * @param level Risk level ('high' | 'moderate' | 'low').
+ * @returns Hex color string.
+ */
+export function getRiskColor(level: 'high' | 'moderate' | 'low'): string {
+  if (level === 'high') return '#F25C54'; // Coral Red
+  if (level === 'moderate') return '#F4A261'; // Amber
+  return '#52B788'; // Emerald Green
+}
+
+/**
+ * Renders an appropriate Lucide icon representing the infrastructure asset category.
+ *
+ * @param cat Infrastructure category.
+ * @returns React icon element.
+ */
+export function renderCategoryIcon(cat: InfraCategory): React.ReactElement {
+  if (cat === 'Data Center') return <Server className="w-3.5 h-3.5 text-[#E57A54]" />;
+  if (cat === 'Power Supply') return <Zap className="w-3.5 h-3.5 text-[#F4A261]" />;
+  if (cat === 'Corporate HQ') return <Building2 className="w-3.5 h-3.5 text-[#A8DADC]" />;
+  return <Cpu className="w-3.5 h-3.5 text-[#F25C54]" />;
+}
+
+/**
+ * Interactive US Infrastructure & Physical Hazard Map Tab Component.
+ *
+ * @param props Component properties containing stock profiles and optional initial ticker.
+ * @returns React component rendering SVG map and facility deep-dive panel.
+ */
 export const USInfrastructureMapTab: React.FC<USInfrastructureMapTabProps> = ({
   profiles,
   initialSelectedTicker,
@@ -103,18 +141,7 @@ export const USInfrastructureMapTab: React.FC<USInfrastructureMapTabProps> = ({
     [sortedProfiles, selectedTicker]
   );
 
-  const riskColor = (level: 'high' | 'moderate' | 'low') => {
-    if (level === 'high') return '#F25C54'; // Coral Red
-    if (level === 'moderate') return '#F4A261'; // Amber
-    return '#52B788'; // Emerald Green
-  };
-
-  const renderCategoryIcon = (cat: InfraCategory) => {
-    if (cat === 'Data Center') return <Server className="w-3.5 h-3.5 text-[#E57A54]" />;
-    if (cat === 'Power Supply') return <Zap className="w-3.5 h-3.5 text-[#F4A261]" />;
-    if (cat === 'Corporate HQ') return <Building2 className="w-3.5 h-3.5 text-[#A8DADC]" />;
-    return <Cpu className="w-3.5 h-3.5 text-[#F25C54]" />;
-  };
+  const riskColor = getRiskColor;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
