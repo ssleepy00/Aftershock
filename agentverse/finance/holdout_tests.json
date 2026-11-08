@@ -1,0 +1,208 @@
+[
+  {
+    "id": "H01",
+    "type": "csv_parser",
+    "description": "Pipe-delimited markdown table with header and alignment row",
+    "input": "Symbol | Weight\n--- | ---\nTSLA | 55.5%\nORCL | 44.5%",
+    "expected": [
+      { "ticker": "TSLA", "weight": 55.5 },
+      { "ticker": "ORCL", "weight": 44.5 }
+    ],
+    "requirement": "CSV parser must handle pipe-delimited markdown tables and skip separator lines."
+  },
+  {
+    "id": "H02",
+    "type": "csv_parser",
+    "description": "Colon-separated key-value list with mixed casing",
+    "input": "eqix: 30\nxom: 30\nnee: 40",
+    "expected": [
+      { "ticker": "EQIX", "weight": 30.0 },
+      { "ticker": "XOM", "weight": 30.0 },
+      { "ticker": "NEE", "weight": 40.0 }
+    ],
+    "requirement": "CSV parser must support colon-delimited key:value pairs."
+  },
+  {
+    "id": "H03",
+    "type": "csv_parser",
+    "description": "Comment lines (#) and blank lines interspersed with holdings",
+    "input": "# Q4 Institutional Portfolio\n\nINTC, 25\n# Core Cloud\nAMZN, 75\n",
+    "expected": [
+      { "ticker": "INTC", "weight": 25.0 },
+      { "ticker": "AMZN", "weight": 75.0 }
+    ],
+    "requirement": "CSV parser must skip comment lines starting with # and blank lines."
+  },
+  {
+    "id": "H04",
+    "type": "csv_parser",
+    "description": "Three duplicate entries of the same single-letter ticker (C) summed with AAPL",
+    "input": "C, 10\nAAPL, 70\nC, 12.5\nC, 7.5",
+    "expected": [
+      { "ticker": "C", "weight": 30.0 },
+      { "ticker": "AAPL", "weight": 70.0 }
+    ],
+    "requirement": "CSV parser must sum 3+ occurrences of a 1-letter ticker."
+  },
+  {
+    "id": "H05",
+    "type": "csv_parser",
+    "description": "Numbered list with parenthesis 1) and 2) prefixes",
+    "input": "1) GOOGL 48.2%\n2) AMD 51.8%",
+    "expected": [
+      { "ticker": "GOOGL", "weight": 48.2 },
+      { "ticker": "AMD", "weight": 51.8 }
+    ],
+    "requirement": "CSV parser must strip numbered list prefixes like '1)' and '2)' without mistaking the index for weight."
+  },
+  {
+    "id": "H06",
+    "type": "portfolio_logic",
+    "description": "Unnormalized basis-point style weights [250, 250, 500] normalize to [25.0, 25.0, 50.0]",
+    "input": [
+      { "ticker": "NEE", "weight": 250 },
+      { "ticker": "EQIX", "weight": 250 },
+      { "ticker": "MSFT", "weight": 500 }
+    ],
+    "check": "normalize_weights",
+    "expected": { "NEE": 25.0, "EQIX": 25.0, "MSFT": 50.0 },
+    "requirement": "buildPortfolioProfiles must normalize arbitrary positive weight scales to 100.0%."
+  },
+  {
+    "id": "H07",
+    "type": "portfolio_logic",
+    "description": "Strict sorting on 7-stock portfolio across all hazard tiers",
+    "input": [
+      { "ticker": "MSFT", "weight": 15 },
+      { "ticker": "ORCL", "weight": 15 },
+      { "ticker": "AAPL", "weight": 15 },
+      { "ticker": "AMD", "weight": 15 },
+      { "ticker": "NVDA", "weight": 15 },
+      { "ticker": "XOM", "weight": 15 },
+      { "ticker": "NEE", "weight": 10 }
+    ],
+    "check": "sorted_order",
+    "expected": ["NEE", "XOM", "NVDA", "AMD", "AAPL", "ORCL", "MSFT"],
+    "requirement": "Holdings must be strictly ordered from most negative unpricedRiskPct (-2.1%) to least (-0.4%)."
+  },
+  {
+    "id": "H08",
+    "type": "portfolio_logic",
+    "description": "Asymmetric 4-to-1 portfolio: 4 high-risk stocks (20% each) and 1 low-risk stock (MSFT 20%) limited by MSFT's +5.0 pt cap -> total turnover = 5.0%",
+    "input": [
+      { "ticker": "NEE", "weight": 20 },
+      { "ticker": "EQIX", "weight": 20 },
+      { "ticker": "XOM", "weight": 20 },
+      { "ticker": "TSLA", "weight": 20 },
+      { "ticker": "MSFT", "weight": 20 }
+    ],
+    "check": "exact_turnover_tx",
+    "expected": { "turnoverPct": 5.0, "transactionCostPct": 0.01 },
+    "requirement": "When only 1 low-risk stock is available to absorb reallocated weight, its +5.0 pt cap limits total portfolio one-way turnover to 5.0%."
+  },
+  {
+    "id": "H09",
+    "type": "portfolio_logic",
+    "description": "Asymmetric 1-to-4 portfolio: 1 high-risk stock (NEE 40%) and 4 low-risk stocks (15% each) limited by NEE's -5.0 pt cap -> NEE hedgedWeight = 35.0%",
+    "input": [
+      { "ticker": "NEE", "weight": 40 },
+      { "ticker": "MSFT", "weight": 15 },
+      { "ticker": "ORCL", "weight": 15 },
+      { "ticker": "AAPL", "weight": 15 },
+      { "ticker": "AMD", "weight": 15 }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": { "max_abs_delta_lte": 5.0, "turnover_lte": 5.0 },
+    "requirement": "When only 1 high-risk stock is trimmed, its -5.0 pt cap limits total one-way turnover to 5.0%."
+  },
+  {
+    "id": "H10",
+    "type": "portfolio_logic",
+    "description": "12-stock broad portfolio obeys both <= 5.0 pt stock delta and <= 15.0% turnover cap",
+    "input": [
+      { "ticker": "NEE", "weight": 9 },
+      { "ticker": "EQIX", "weight": 9 },
+      { "ticker": "XOM", "weight": 9 },
+      { "ticker": "TSLA", "weight": 9 },
+      { "ticker": "NVDA", "weight": 9 },
+      { "ticker": "INTC", "weight": 9 },
+      { "ticker": "META", "weight": 8 },
+      { "ticker": "AMZN", "weight": 8 },
+      { "ticker": "GOOGL", "weight": 8 },
+      { "ticker": "AMD", "weight": 8 },
+      { "ticker": "ORCL", "weight": 7 },
+      { "ticker": "MSFT", "weight": 7 }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": { "max_abs_delta_lte": 5.0, "turnover_lte": 15.0 },
+    "requirement": "12-stock portfolio must strictly satisfy |delta_i| <= 5.0 and turnover <= 15.0%."
+  },
+  {
+    "id": "H11",
+    "type": "portfolio_logic",
+    "description": "Tiny high-risk weight (NEE 1.5%, XOM 48.5%, MSFT 50.0%) clamps NEE reduction at 1.5% (hedgedWeight = 0.0%)",
+    "input": [
+      { "ticker": "NEE", "weight": 1.5 },
+      { "ticker": "XOM", "weight": 48.5 },
+      { "ticker": "MSFT", "weight": 50.0 }
+    ],
+    "check": "non_negative_and_caps",
+    "expected": { "min_weight_gte": 0.0, "max_abs_delta_lte": 5.0, "turnover_lte": 15.0 },
+    "requirement": "A high-risk stock with initial weight < 5.0% must be clamped at 0.0% without going negative."
+  },
+  {
+    "id": "H12",
+    "type": "portfolio_logic",
+    "description": "Dominant low-risk stock (NEE 3%, MSFT 97%) clamps MSFT increase at +3.0% so MSFT <= 100.0%",
+    "input": [
+      { "ticker": "NEE", "weight": 3.0 },
+      { "ticker": "MSFT", "weight": 97.0 }
+    ],
+    "check": "exact_hedged_weights",
+    "expected": { "NEE": 0.0, "MSFT": 100.0 },
+    "requirement": "When weight is 97.0% and 3.0%, hedging shifts at most 3.0% so weights stay within [0, 100]."
+  },
+  {
+    "id": "H13",
+    "type": "portfolio_logic",
+    "description": "Coastal Grid & Data REITs preset improves net Unpriced Risk, Sharpe, and Max Drawdown after tx costs",
+    "input": [
+      { "ticker": "NEE", "weight": 28 },
+      { "ticker": "EQIX", "weight": 24 },
+      { "ticker": "XOM", "weight": 22 },
+      { "ticker": "AMZN", "weight": 14 },
+      { "ticker": "MSFT", "weight": 12 }
+    ],
+    "check": "metrics_improvement",
+    "expected": { "unpriced_improved": true, "sharpe_improved": true, "mdd_improved": true },
+    "requirement": "Hedged Coastal Grid & Data REITs portfolio must improve net Unpriced Risk, Sharpe, and Max Drawdown."
+  },
+  {
+    "id": "H14",
+    "type": "portfolio_logic",
+    "description": "Fault-Line Hardware & Fabs preset lowers Exposure Score (/100) when hedged",
+    "input": [
+      { "ticker": "NVDA", "weight": 28 },
+      { "ticker": "TSLA", "weight": 22 },
+      { "ticker": "INTC", "weight": 20 },
+      { "ticker": "AAPL", "weight": 18 },
+      { "ticker": "AMD", "weight": 12 }
+    ],
+    "check": "exposure_score_decreases",
+    "expected": true,
+    "requirement": "Risk-hedged weights on Fault-Line Hardware & Fabs must lower the portfolio Exposure Score (/100)."
+  },
+  {
+    "id": "H15",
+    "type": "portfolio_logic",
+    "description": "Mixed known and unseen tickers [PLTR 35, SNOW 35, EQIX 30] obey all hedge and sum constraints",
+    "input": [
+      { "ticker": "PLTR", "weight": 35 },
+      { "ticker": "SNOW", "weight": 35 },
+      { "ticker": "EQIX", "weight": 30 }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": { "max_abs_delta_lte": 5.0, "turnover_lte": 15.0 },
+    "requirement": "Unseen tickers mixed with known tickers must obey <= 5.0 pt stock delta, <= 15.0% turnover, and 100.0% sum."
+  }
+]

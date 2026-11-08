@@ -1,0 +1,328 @@
+{
+  "sources": [
+    {
+      "id": "FEMA_NRI",
+      "name": "FEMA National Risk Index (NRI v1.19)",
+      "url": "https://hazards.fema.gov/nri/",
+      "licence": "Public Domain (17 U.S.C. § 105)"
+    },
+    {
+      "id": "USGS_NSHM",
+      "name": "USGS 2023 National Seismic Hazard Model (PGA 2% in 50-Year)",
+      "url": "https://www.usgs.gov/programs/earthquake-hazards/science/national-seismic-hazard-model",
+      "licence": "Public Domain (US Government Work)"
+    },
+    {
+      "id": "NOAA_HURDAT2",
+      "name": "NOAA NHC HURDAT2 Atlantic Hurricane Database",
+      "url": "https://www.nhc.noaa.gov/data/#hurdat",
+      "licence": "Public Domain (US Government Work)"
+    },
+    {
+      "id": "EPOCH_AI",
+      "name": "Epoch AI Frontier Data Centers Hub",
+      "url": "https://epoch.ai/data/data-centers",
+      "licence": "CC BY 4.0"
+    },
+    {
+      "id": "PNNL_ATLAS",
+      "name": "PNNL IM3 Open Source Data Center Atlas",
+      "url": "https://data.msdlive.org/",
+      "licence": "ODbL v1.0 / CC BY 4.0"
+    },
+    {
+      "id": "EIA_860",
+      "name": "US Energy Information Administration Form EIA-860",
+      "url": "https://www.eia.gov/electricity/data/eia860/",
+      "licence": "Public Domain (US DOE)"
+    },
+    {
+      "id": "SEC_10K",
+      "name": "SEC EDGAR Form 10-K (Item 2 Properties)",
+      "url": "https://www.sec.gov/edgar/searchedgar/companysearch",
+      "licence": "Public Domain (US SEC)"
+    }
+  ],
+  "county_reference": {
+    "Santa Clara|CA": {
+      "fips": "06085",
+      "fema_earthquake": "Very High",
+      "fema_hurricane": "Not Applicable",
+      "usgs_pga_g": 0.68,
+      "expected_hazard": "Earthquake",
+      "allowed_risk_levels": ["high", "moderate"]
+    },
+    "Menlo Park|CA": {
+      "fips": "06081",
+      "fema_earthquake": "Very High",
+      "fema_hurricane": "Not Applicable",
+      "usgs_pga_g": 0.72,
+      "expected_hazard": "Earthquake",
+      "allowed_risk_levels": ["high"]
+    },
+    "Mountain View|CA": {
+      "fips": "06085",
+      "fema_earthquake": "Very High",
+      "fema_hurricane": "Not Applicable",
+      "usgs_pga_g": 0.70,
+      "expected_hazard": "Earthquake",
+      "allowed_risk_levels": ["high"]
+    },
+    "Cupertino|CA": {
+      "fips": "06085",
+      "fema_earthquake": "Very High",
+      "fema_hurricane": "Not Applicable",
+      "usgs_pga_g": 0.68,
+      "expected_hazard": "Earthquake",
+      "allowed_risk_levels": ["high", "moderate"]
+    },
+    "Redwood City|CA": {
+      "fips": "06081",
+      "fema_earthquake": "Very High",
+      "fema_hurricane": "Not Applicable",
+      "usgs_pga_g": 0.71,
+      "expected_hazard": "Earthquake",
+      "allowed_risk_levels": ["high"]
+    },
+    "Fremont|CA": {
+      "fips": "06001",
+      "fema_earthquake": "Very High",
+      "fema_hurricane": "Not Applicable",
+      "usgs_pga_g": 0.75,
+      "expected_hazard": "Earthquake",
+      "allowed_risk_levels": ["high"]
+    },
+    "Hillsboro|OR": {
+      "fips": "41067",
+      "fema_earthquake": "Very High",
+      "fema_hurricane": "Not Applicable",
+      "usgs_pga_g": 0.48,
+      "expected_hazard": "Earthquake",
+      "allowed_risk_levels": ["high", "moderate"]
+    },
+    "Seattle|WA": {
+      "fips": "53033",
+      "fema_earthquake": "Very High",
+      "fema_hurricane": "Not Applicable",
+      "usgs_pga_g": 0.58,
+      "expected_hazard": "Earthquake",
+      "allowed_risk_levels": ["high"]
+    },
+    "Redmond|WA": {
+      "fips": "53033",
+      "fema_earthquake": "Very High",
+      "fema_hurricane": "Not Applicable",
+      "usgs_pga_g": 0.52,
+      "expected_hazard": "Earthquake",
+      "allowed_risk_levels": ["high", "moderate"]
+    },
+    "Quincy|WA": {
+      "fips": "53025",
+      "fema_earthquake": "Relatively Low",
+      "fema_hurricane": "Not Applicable",
+      "usgs_pga_g": 0.14,
+      "expected_hazard": "Low",
+      "allowed_risk_levels": ["low"]
+    },
+    "Council Bluffs|IA": {
+      "fips": "19155",
+      "fema_earthquake": "Very Low",
+      "fema_hurricane": "Not Applicable",
+      "usgs_pga_g": 0.06,
+      "expected_hazard": "Low",
+      "allowed_risk_levels": ["low"]
+    },
+    "Chandler|AZ": {
+      "fips": "04013",
+      "fema_earthquake": "Relatively Low",
+      "fema_hurricane": "Very Low",
+      "usgs_pga_g": 0.08,
+      "expected_hazard": "Low",
+      "allowed_risk_levels": ["low"]
+    },
+    "Abilene|TX": {
+      "fips": "48441",
+      "fema_earthquake": "Very Low",
+      "fema_hurricane": "Very Low",
+      "usgs_pga_g": 0.05,
+      "expected_hazard": "Low",
+      "allowed_risk_levels": ["low"]
+    },
+    "Austin|TX": {
+      "fips": "48453",
+      "fema_earthquake": "Very Low",
+      "fema_hurricane": "Relatively Low",
+      "usgs_pga_g": 0.04,
+      "expected_hazard": "Low",
+      "allowed_risk_levels": ["low"]
+    },
+    "Ashburn|VA": {
+      "fips": "51107",
+      "fema_earthquake": "Very Low",
+      "fema_hurricane": "Relatively Moderate",
+      "usgs_pga_g": 0.07,
+      "expected_hazard": "Hurricane",
+      "allowed_risk_levels": ["high", "moderate"]
+    },
+    "Henrico|VA": {
+      "fips": "51087",
+      "fema_earthquake": "Very Low",
+      "fema_hurricane": "Relatively High",
+      "usgs_pga_g": 0.08,
+      "expected_hazard": "Hurricane",
+      "allowed_risk_levels": ["high", "moderate"]
+    },
+    "Chesapeake|VA": {
+      "fips": "51550",
+      "fema_earthquake": "Very Low",
+      "fema_hurricane": "Relatively High",
+      "usgs_pga_g": 0.06,
+      "expected_hazard": "Hurricane",
+      "allowed_risk_levels": ["high"]
+    },
+    "Boydton|VA": {
+      "fips": "51117",
+      "fema_earthquake": "Very Low",
+      "fema_hurricane": "Relatively Moderate",
+      "usgs_pga_g": 0.06,
+      "expected_hazard": "Hurricane",
+      "allowed_risk_levels": ["moderate"]
+    },
+    "Maiden|NC": {
+      "fips": "37035",
+      "fema_earthquake": "Relatively Low",
+      "fema_hurricane": "Relatively Moderate",
+      "usgs_pga_g": 0.10,
+      "expected_hazard": "Hurricane",
+      "allowed_risk_levels": ["moderate"]
+    },
+    "Moncks Corner|SC": {
+      "fips": "45015",
+      "fema_earthquake": "Relatively High",
+      "fema_hurricane": "Very High",
+      "usgs_pga_g": 0.45,
+      "expected_hazard": "Hurricane",
+      "allowed_risk_levels": ["high"]
+    },
+    "Miami|FL": {
+      "fips": "12086",
+      "fema_earthquake": "Very Low",
+      "fema_hurricane": "Very High",
+      "usgs_pga_g": 0.02,
+      "expected_hazard": "Hurricane",
+      "allowed_risk_levels": ["high"]
+    },
+    "Homestead|FL": {
+      "fips": "12086",
+      "fema_earthquake": "Very Low",
+      "fema_hurricane": "Very High",
+      "usgs_pga_g": 0.02,
+      "expected_hazard": "Hurricane",
+      "allowed_risk_levels": ["high"]
+    },
+    "Juno Beach|FL": {
+      "fips": "12099",
+      "fema_earthquake": "Very Low",
+      "fema_hurricane": "Very High",
+      "usgs_pga_g": 0.02,
+      "expected_hazard": "Hurricane",
+      "allowed_risk_levels": ["high"]
+    },
+    "Jensen Beach|FL": {
+      "fips": "12111",
+      "fema_earthquake": "Very Low",
+      "fema_hurricane": "Very High",
+      "usgs_pga_g": 0.02,
+      "expected_hazard": "Hurricane",
+      "allowed_risk_levels": ["high"]
+    },
+    "Baytown|TX": {
+      "fips": "48201",
+      "fema_earthquake": "Very Low",
+      "fema_hurricane": "Very High",
+      "usgs_pga_g": 0.04,
+      "expected_hazard": "Hurricane",
+      "allowed_risk_levels": ["high"]
+    },
+    "Spring|TX": {
+      "fips": "48201",
+      "fema_earthquake": "Very Low",
+      "fema_hurricane": "Very High",
+      "usgs_pga_g": 0.04,
+      "expected_hazard": "Hurricane",
+      "allowed_risk_levels": ["high", "moderate"]
+    },
+    "Beaumont|TX": {
+      "fips": "48245",
+      "fema_earthquake": "Very Low",
+      "fema_hurricane": "Very High",
+      "usgs_pga_g": 0.04,
+      "expected_hazard": "Hurricane",
+      "allowed_risk_levels": ["high"]
+    },
+    "Corpus Christi|TX": {
+      "fips": "48355",
+      "fema_earthquake": "Very Low",
+      "fema_hurricane": "Very High",
+      "usgs_pga_g": 0.03,
+      "expected_hazard": "Hurricane",
+      "allowed_risk_levels": ["high"]
+    },
+    "Salem Township|PA": {
+      "fips": "42079",
+      "fema_earthquake": "Very Low",
+      "fema_hurricane": "Relatively Low",
+      "usgs_pga_g": 0.06,
+      "expected_hazard": "Low",
+      "allowed_risk_levels": ["low"]
+    },
+    "Mineral|VA": {
+      "fips": "51109",
+      "fema_earthquake": "Relatively Moderate",
+      "fema_hurricane": "Relatively Moderate",
+      "usgs_pga_g": 0.18,
+      "expected_hazard": "Hurricane",
+      "allowed_risk_levels": ["moderate"]
+    }
+  },
+  "facility_verification": {
+    "nvda-hq": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Santa Clara", "expected_state": "CA", "lat": 37.3708, "lng": -121.9636 },
+    "nvda-dc": { "status": "VERIFIED", "source": "EPOCH_AI", "expected_city": "Santa Clara", "expected_state": "CA", "lat": 37.385, "lng": -121.952 },
+    "nvda-pwr": { "status": "NOT_VERIFIED", "source": "EIA_860", "note": "No NVIDIA-owned dedicated substation in EIA-860; leased colocation power feed" },
+    "nvda-fab": { "status": "NOT_VERIFIED", "source": "SEC_10K", "note": "Hillsboro OR site is an engineering validation lab, not disclosed in Item 2 as a wafer fab" },
+    "meta-hq": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Menlo Park", "expected_state": "CA", "lat": 37.484, "lng": -122.148 },
+    "meta-dc": { "status": "VERIFIED", "source": "PNNL_ATLAS", "expected_city": "Henrico", "expected_state": "VA", "lat": 37.501, "lng": -77.332 },
+    "meta-pwr": { "status": "VERIFIED", "source": "EIA_860", "expected_city": "Chesapeake", "expected_state": "VA", "lat": 36.768, "lng": -76.287 },
+    "amzn-dc": { "status": "VERIFIED", "source": "PNNL_ATLAS", "expected_city": "Ashburn", "expected_state": "VA", "lat": 39.0438, "lng": -77.4874 },
+    "amzn-pwr": { "status": "VERIFIED", "source": "EIA_860", "expected_city": "Mineral", "expected_state": "VA", "lat": 38.06, "lng": -77.789, "note": "Dominion North Anna Nuclear Power Station PPA in Louisa County (Mineral), VA; Susquehanna is in Salem Township, PA" },
+    "amzn-hq": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Seattle", "expected_state": "WA", "lat": 47.622, "lng": -122.336 },
+    "googl-dc": { "status": "VERIFIED", "source": "PNNL_ATLAS", "expected_city": "Moncks Corner", "expected_state": "SC", "lat": 33.126, "lng": -80.008 },
+    "googl-hq": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Mountain View", "expected_state": "CA", "lat": 37.422, "lng": -122.084 },
+    "googl-pwr": { "status": "VERIFIED", "source": "EIA_860", "expected_city": "Council Bluffs", "expected_state": "IA", "lat": 41.201, "lng": -95.842 },
+    "msft-dc": { "status": "VERIFIED", "source": "PNNL_ATLAS", "expected_city": "Boydton", "expected_state": "VA", "lat": 36.667, "lng": -78.387 },
+    "msft-hq": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Redmond", "expected_state": "WA", "lat": 47.642, "lng": -122.125 },
+    "msft-pwr": { "status": "VERIFIED", "source": "EIA_860", "expected_city": "Quincy", "expected_state": "WA", "lat": 47.234, "lng": -119.852 },
+    "aapl-hq": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Cupertino", "expected_state": "CA", "lat": 37.334, "lng": -122.009 },
+    "aapl-dc": { "status": "VERIFIED", "source": "PNNL_ATLAS", "expected_city": "Maiden", "expected_state": "NC", "lat": 35.575, "lng": -81.211 },
+    "eqix-dc1": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Miami", "expected_state": "FL", "lat": 25.782, "lng": -80.193 },
+    "eqix-pwr": { "status": "VERIFIED", "source": "PNNL_ATLAS", "expected_city": "Ashburn", "expected_state": "VA", "lat": 39.016, "lng": -77.459 },
+    "eqix-hq": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Redwood City", "expected_state": "CA", "lat": 37.529, "lng": -122.254 },
+    "intc-fab": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Hillsboro", "expected_state": "OR", "lat": 45.545, "lng": -122.912 },
+    "intc-hq": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Santa Clara", "expected_state": "CA", "lat": 37.387, "lng": -121.963 },
+    "intc-pwr": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Chandler", "expected_state": "AZ", "lat": 33.243, "lng": -111.884 },
+    "tsla-fab": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Fremont", "expected_state": "CA", "lat": 37.492, "lng": -121.944 },
+    "tsla-hq": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Austin", "expected_state": "TX", "lat": 30.222, "lng": -97.617 },
+    "tsla-pwr": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Corpus Christi", "expected_state": "TX", "lat": 27.78, "lng": -97.51 },
+    "nee-pwr1": { "status": "VERIFIED", "source": "EIA_860", "expected_city": "Homestead", "expected_state": "FL", "lat": 25.435, "lng": -80.331 },
+    "nee-hq": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Juno Beach", "expected_state": "FL", "lat": 26.879, "lng": -80.056 },
+    "nee-pwr2": { "status": "VERIFIED", "source": "EIA_860", "expected_city": "Jensen Beach", "expected_state": "FL", "lat": 27.348, "lng": -80.246 },
+    "xom-pwr": { "status": "VERIFIED", "source": "EIA_860", "expected_city": "Baytown", "expected_state": "TX", "lat": 29.745, "lng": -95.012 },
+    "xom-hq": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Spring", "expected_state": "TX", "lat": 30.098, "lng": -95.442 },
+    "xom-fab": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Beaumont", "expected_state": "TX", "lat": 30.068, "lng": -94.095 },
+    "orcl-hq": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Austin", "expected_state": "TX", "lat": 30.244, "lng": -97.721 },
+    "orcl-dc": { "status": "VERIFIED", "source": "PNNL_ATLAS", "expected_city": "Ashburn", "expected_state": "VA", "lat": 39.025, "lng": -77.471 },
+    "orcl-pwr": { "status": "VERIFIED", "source": "EPOCH_AI", "expected_city": "Abilene", "expected_state": "TX", "lat": 32.448, "lng": -99.733 },
+    "amd-hq": { "status": "VERIFIED", "source": "SEC_10K", "expected_city": "Santa Clara", "expected_state": "CA", "lat": 37.381, "lng": -121.972 },
+    "amd-dc": { "status": "NOT_VERIFIED", "source": "SEC_10K", "note": "AMD Austin campus is leased engineering office space in SEC 10-K, not a public data center in Epoch AI or PNNL Atlas" }
+  }
+}

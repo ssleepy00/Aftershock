@@ -1,0 +1,318 @@
+[
+  {
+    "id": "P01",
+    "type": "csv_parser",
+    "description": "Standard CSV with Ticker,Weight header",
+    "input": "Ticker,Weight\nNVDA,60\nMSFT,40",
+    "expected": [
+      { "ticker": "NVDA", "weight": 60.0 },
+      { "ticker": "MSFT", "weight": 40.0 }
+    ],
+    "requirement": "CSV parser must skip header row and parse standard comma-separated Ticker,Weight rows."
+  },
+  {
+    "id": "P02",
+    "type": "csv_parser",
+    "description": "Lowercase tickers with percentage symbols",
+    "input": "nvda 35%\namzn 65%",
+    "expected": [
+      { "ticker": "NVDA", "weight": 35.0 },
+      { "ticker": "AMZN", "weight": 65.0 }
+    ],
+    "requirement": "CSV parser must uppercase lowercase ticker symbols and strip % signs."
+  },
+  {
+    "id": "P03",
+    "type": "csv_parser",
+    "description": "Single-letter NYSE tickers (V, F, T)",
+    "input": "V,45\nF,30\nT,25",
+    "expected": [
+      { "ticker": "V", "weight": 45.0 },
+      { "ticker": "F", "weight": 30.0 },
+      { "ticker": "T", "weight": 25.0 }
+    ],
+    "requirement": "CSV parser must support 1-to-5 letter US ticker symbols (including 1-letter tickers like V, F, T)."
+  },
+  {
+    "id": "P04",
+    "type": "csv_parser",
+    "description": "Tab-separated (TSV) input with header",
+    "input": "SYMBOL\tALLOCATION\nMETA\t50\nGOOGL\t50",
+    "expected": [
+      { "ticker": "META", "weight": 50.0 },
+      { "ticker": "GOOGL", "weight": 50.0 }
+    ],
+    "requirement": "CSV parser must handle tab-separated TSV rows and ignore header labels."
+  },
+  {
+    "id": "P05",
+    "type": "csv_parser",
+    "description": "Duplicate ticker rows aggregated by summing weights",
+    "input": "NVDA,20\nMSFT,50\nNVDA,30",
+    "expected": [
+      { "ticker": "NVDA", "weight": 50.0 },
+      { "ticker": "MSFT", "weight": 50.0 }
+    ],
+    "requirement": "CSV parser must aggregate duplicate tickers by summing their weights rather than emitting duplicate ticker entries."
+  },
+  {
+    "id": "P06",
+    "type": "csv_parser",
+    "description": "Zero and negative weights filtered out",
+    "input": "AAPL,50\nTSLA,0\nINTC,-10\nAMD,50",
+    "expected": [
+      { "ticker": "AAPL", "weight": 50.0 },
+      { "ticker": "AMD", "weight": 50.0 }
+    ],
+    "requirement": "CSV parser must reject zero or negative weights."
+  },
+  {
+    "id": "P07",
+    "type": "csv_parser",
+    "description": "Summary and non-equity footer words ignored (TOTAL, CASH, SUM)",
+    "input": "TICKER,WEIGHT\nXOM,70\nNEE,30\nTOTAL,100\nSUM,100\nCASH,0",
+    "expected": [
+      { "ticker": "XOM", "weight": 70.0 },
+      { "ticker": "NEE", "weight": 30.0 }
+    ],
+    "requirement": "CSV parser must filter reserved table words (TICKER, WEIGHT, SYMBOL, TOTAL, SUM, CASH, PORTFOLIO)."
+  },
+  {
+    "id": "P08",
+    "type": "csv_parser",
+    "description": "Semicolon-delimited decimal weights",
+    "input": "EQIX;25.5\nORCL;74.5",
+    "expected": [
+      { "ticker": "EQIX", "weight": 25.5 },
+      { "ticker": "ORCL", "weight": 74.5 }
+    ],
+    "requirement": "CSV parser must support semicolon-delimited rows."
+  },
+  {
+    "id": "P09",
+    "type": "csv_parser",
+    "description": "Double-quoted CSV cells with percent sign",
+    "input": "\"NVDA\",\"42.5%\"\n\"AAPL\",\"57.5%\"",
+    "expected": [
+      { "ticker": "NVDA", "weight": 42.5 },
+      { "ticker": "AAPL", "weight": 57.5 }
+    ],
+    "requirement": "CSV parser must strip surrounding quotes from ticker and weight fields."
+  },
+  {
+    "id": "P10",
+    "type": "csv_parser",
+    "description": "Multi-column brokerage export with dollar value column after weight",
+    "input": "NVDA, 33.3%, $10000\nMSFT, 66.7%, $20000",
+    "expected": [
+      { "ticker": "NVDA", "weight": 33.3 },
+      { "ticker": "MSFT", "weight": 66.7 }
+    ],
+    "requirement": "CSV parser must extract the percentage weight per line and ignore trailing dollar columns."
+  },
+  {
+    "id": "P11",
+    "type": "portfolio_logic",
+    "description": "Unnormalized weights [30, 30] normalize to [50.0, 50.0]",
+    "input": [
+      { "ticker": "NVDA", "weight": 30 },
+      { "ticker": "MSFT", "weight": 30 }
+    ],
+    "check": "normalize_weights",
+    "expected": { "NVDA": 50.0, "MSFT": 50.0 },
+    "requirement": "buildPortfolioProfiles must normalize input weights to sum to 100.0%."
+  },
+  {
+    "id": "P12",
+    "type": "portfolio_logic",
+    "description": "Holdings sorted by most negative unpricedRiskPct ascending",
+    "input": [
+      { "ticker": "MSFT", "weight": 50 },
+      { "ticker": "NVDA", "weight": 30 },
+      { "ticker": "NEE", "weight": 20 }
+    ],
+    "check": "sorted_order",
+    "expected": ["NEE", "NVDA", "MSFT"],
+    "requirement": "buildPortfolioProfiles must sort holdings from highest unpriced risk (most negative %) to lowest."
+  },
+  {
+    "id": "P13",
+    "type": "portfolio_logic",
+    "description": "Spec Hedge Limit: max 5.0 pts weight change per stock on AI & Cloud Leaders preset",
+    "input": [
+      { "ticker": "NVDA", "weight": 24 },
+      { "ticker": "META", "weight": 18 },
+      { "ticker": "AMZN", "weight": 18 },
+      { "ticker": "GOOGL", "weight": 15 },
+      { "ticker": "MSFT", "weight": 15 },
+      { "ticker": "EQIX", "weight": 10 }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": { "max_abs_delta_lte": 5.0, "turnover_lte": 15.0 },
+    "requirement": "Spec Layer 04: Per-stock weight delta |hedgedWeight - weight| must be <= 5.0 percentage points and one-way turnover <= 15.0%."
+  },
+  {
+    "id": "P14",
+    "type": "portfolio_logic",
+    "description": "Exact hand-worked 2-stock hedge cap: NEE (80%) and MSFT (20%) capped at +/- 5.0 pts -> 75.0% and 25.0%",
+    "input": [
+      { "ticker": "NEE", "weight": 80 },
+      { "ticker": "MSFT", "weight": 20 }
+    ],
+    "check": "exact_hedged_weights",
+    "expected": { "NEE": 75.0, "MSFT": 25.0 },
+    "requirement": "Spec Layer 04: For 2 stocks with severe vs low risk (NEE 80%, MSFT 20%), the +/- 5.0 pt cap binds directly to produce 75.0% and 25.0%."
+  },
+  {
+    "id": "P15",
+    "type": "portfolio_logic",
+    "description": "Exact hand-worked 10-stock turnover cap: 5 high-risk & 5 low-risk stocks at 10% each must scale deltas from +/-5.0 to +/-3.0 so one-way turnover = 15.0%",
+    "input": [
+      { "ticker": "NEE", "weight": 10 },
+      { "ticker": "EQIX", "weight": 10 },
+      { "ticker": "XOM", "weight": 10 },
+      { "ticker": "TSLA", "weight": 10 },
+      { "ticker": "NVDA", "weight": 10 },
+      { "ticker": "MSFT", "weight": 10 },
+      { "ticker": "ORCL", "weight": 10 },
+      { "ticker": "AAPL", "weight": 10 },
+      { "ticker": "AMD", "weight": 10 },
+      { "ticker": "GOOGL", "weight": 10 }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": { "max_abs_delta_lte": 5.0, "turnover_lte": 15.0 },
+    "requirement": "Spec Layer 04: One-way turnover 0.5 * sum(|hedgedWeight - weight|) must never exceed 15.0% even with 10 holdings."
+  },
+  {
+    "id": "P16",
+    "type": "portfolio_logic",
+    "description": "Hedged weights sum to 100.0% on Coastal Grid & Data REITs preset",
+    "input": [
+      { "ticker": "NEE", "weight": 28 },
+      { "ticker": "EQIX", "weight": 24 },
+      { "ticker": "XOM", "weight": 22 },
+      { "ticker": "AMZN", "weight": 14 },
+      { "ticker": "MSFT", "weight": 12 }
+    ],
+    "check": "hedged_sum_100",
+    "expected": 100.0,
+    "requirement": "Hedged portfolio weights must sum to 100.0% (+/- 0.1%)."
+  },
+  {
+    "id": "P17",
+    "type": "portfolio_logic",
+    "description": "Hedged weights sum to 100.0% on Fault-Line Hardware & Fabs preset",
+    "input": [
+      { "ticker": "NVDA", "weight": 28 },
+      { "ticker": "TSLA", "weight": 22 },
+      { "ticker": "INTC", "weight": 20 },
+      { "ticker": "AAPL", "weight": 18 },
+      { "ticker": "AMD", "weight": 12 }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": { "max_abs_delta_lte": 5.0, "turnover_lte": 15.0 },
+    "requirement": "Fault-Line Hardware & Fabs preset must obey both <= 5.0 pt stock cap and <= 15.0% turnover cap."
+  },
+  {
+    "id": "P18",
+    "type": "portfolio_logic",
+    "description": "Single-stock portfolio [NVDA 100%] stays at 100.0% with 0% turnover",
+    "input": [{ "ticker": "NVDA", "weight": 100 }],
+    "check": "exact_hedged_weights",
+    "expected": { "NVDA": 100.0 },
+    "requirement": "A single-stock portfolio must remain 100.0% invested with 0% turnover."
+  },
+  {
+    "id": "P19",
+    "type": "portfolio_logic",
+    "description": "Two stocks with identical unpriced risk keep unchanged weights (0% turnover)",
+    "input": [
+      { "ticker": "NVDA", "weight": 50 },
+      { "ticker": "NVDA", "weight": 50 }
+    ],
+    "check": "hedged_sum_100",
+    "expected": 100.0,
+    "requirement": "Uniform risk portfolio must preserve 100% weight sum."
+  },
+  {
+    "id": "P20",
+    "type": "portfolio_logic",
+    "description": "Directional sanity: highest-risk stock (NEE) weight decreases and lowest-risk stock (MSFT) weight increases",
+    "input": [
+      { "ticker": "NEE", "weight": 40 },
+      { "ticker": "AMZN", "weight": 30 },
+      { "ticker": "MSFT", "weight": 30 }
+    ],
+    "check": "directional_tilt",
+    "expected": { "decrease": "NEE", "increase": "MSFT" },
+    "requirement": "Risk hedging must shift weight out of the worst unpriced-risk stock and into the most resilient stock."
+  },
+  {
+    "id": "P21",
+    "type": "portfolio_logic",
+    "description": "Hedged portfolio strictly improves net unpriced risk and Sharpe Ratio on AI & Cloud Leaders",
+    "input": [
+      { "ticker": "NVDA", "weight": 24 },
+      { "ticker": "META", "weight": 18 },
+      { "ticker": "AMZN", "weight": 18 },
+      { "ticker": "GOOGL", "weight": 15 },
+      { "ticker": "MSFT", "weight": 15 },
+      { "ticker": "EQIX", "weight": 10 }
+    ],
+    "check": "metrics_improvement",
+    "expected": { "unpriced_improved": true, "sharpe_improved": true, "mdd_improved": true },
+    "requirement": "Risk-hedged weights must improve net Unpriced Risk, Sharpe Ratio, and Max Drawdown."
+  },
+  {
+    "id": "P22",
+    "type": "portfolio_logic",
+    "description": "Hand-worked turnover & transaction cost check on [NEE 80, MSFT 20] -> 5.0% turnover, 0.01% tx cost",
+    "input": [
+      { "ticker": "NEE", "weight": 80 },
+      { "ticker": "MSFT", "weight": 20 }
+    ],
+    "check": "exact_turnover_tx",
+    "expected": { "turnoverPct": 5.0, "transactionCostPct": 0.01 },
+    "requirement": "computePortfolioMetrics must compute exact one-way turnover (5.0%) and transaction cost (0.01%)."
+  },
+  {
+    "id": "P23",
+    "type": "portfolio_logic",
+    "description": "Portfolio Exposure Score (/100) decreases when hedged on Coastal Grid & Data REITs",
+    "input": [
+      { "ticker": "NEE", "weight": 28 },
+      { "ticker": "EQIX", "weight": 24 },
+      { "ticker": "XOM", "weight": 22 },
+      { "ticker": "AMZN", "weight": 14 },
+      { "ticker": "MSFT", "weight": 12 }
+    ],
+    "check": "exposure_score_decreases",
+    "expected": true,
+    "requirement": "Risk-hedged portfolio must have a lower Exposure Score (/100) than Current Weights."
+  },
+  {
+    "id": "P24",
+    "type": "portfolio_logic",
+    "description": "Unknown custom ticker fallback respects +/- 5.0 pt cap and sums to 100%",
+    "input": [
+      { "ticker": "ZZZZ", "weight": 40 },
+      { "ticker": "NEE", "weight": 60 }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": { "max_abs_delta_lte": 5.0, "turnover_lte": 15.0 },
+    "requirement": "Custom/unknown tickers must be handled deterministically while obeying the +/- 5.0 pt hedge cap."
+  },
+  {
+    "id": "P25",
+    "type": "portfolio_logic",
+    "description": "Small initial weight (NEE 2%, EQIX 48%, MSFT 50%) never becomes negative after hedging",
+    "input": [
+      { "ticker": "NEE", "weight": 2 },
+      { "ticker": "EQIX", "weight": 48 },
+      { "ticker": "MSFT", "weight": 50 }
+    ],
+    "check": "non_negative_and_caps",
+    "expected": { "min_weight_gte": 0.0, "max_abs_delta_lte": 5.0, "turnover_lte": 15.0 },
+    "requirement": "No stock's hedged weight may ever be negative (w_hedged >= 0)."
+  }
+]

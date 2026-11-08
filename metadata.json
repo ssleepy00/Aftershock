@@ -1,0 +1,6 @@
+{
+  "name": "TerraCluster Spec & Prototype",
+  "description": "Project specification, technical architecture, point-in-time data workflows, and interactive UI components for the US AI Data-Centre Physical Risk & Portfolio Tail-Loss Auditor.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
