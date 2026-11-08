@@ -16,8 +16,8 @@
  *    Coastal Grid & Data REITs, Fault-Line Hardware & Fabs) for immediate scenario testing.
  */
 
-import { StockRiskProfile, PortfolioPreset } from './types';
-import { logFunctionCall } from '../../utils/logger';
+import type { StockRiskProfile, PortfolioPreset } from './types.ts';
+import { logFunctionCall } from '../../utils/logger.ts';
 
 export const STOCK_DATABASE: Record<string, Omit<StockRiskProfile, 'weight' | 'hedgedWeight'>> = {
   NVDA: {

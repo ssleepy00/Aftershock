@@ -23,13 +23,13 @@
  *    baseline portfolio with the hedged defensive allocation.
  */
 
-import {
+import type {
   StockRiskProfile,
   PortfolioMetricsSnapshot,
   PortfolioMetricsComparison,
-} from './types';
-import { CONFIG } from '../../config/appConfig';
-import { logFunctionCall } from '../../utils/logger';
+} from './types.ts';
+import { CONFIG } from '../../config/appConfig.ts';
+import { logFunctionCall } from '../../utils/logger.ts';
 
 /**
  * Computes comparative physical risk, return, downside volatility, and transaction cost

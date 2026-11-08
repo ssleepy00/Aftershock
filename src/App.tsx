@@ -26,11 +26,12 @@ import {
 } from './data/aftershockData';
 import { PortfolioUploadTab } from './components/PortfolioUploadTab';
 import { USInfrastructureMapTab } from './components/USInfrastructureMapTab';
+import { JudgeAuditAndGovernanceTab } from './components/JudgeAuditAndGovernanceTab';
 import { PortfolioExportModal } from './components/PortfolioExportModal';
 import { logFunctionCall } from './utils/logger';
 import { Download } from 'lucide-react';
 
-export type TabId = 'portfolio' | 'map';
+export type TabId = 'portfolio' | 'map' | 'audit';
 
 /**
  * Root Application Component.
@@ -65,7 +66,7 @@ export default function App() {
   };
 
   /**
-   * Switches the active top-level tab between portfolio overview and US map.
+   * Switches the active top-level tab between portfolio overview, US map, and audit view.
    *
    * @param tab Target tab identifier.
    */
@@ -125,7 +126,7 @@ export default function App() {
             </span>
           </div>
 
-          {/* Bubbly 2-Tab Switcher */}
+          {/* Bubbly 3-Tab Switcher */}
           <nav className="flex items-center bg-[#221B16] p-1.5 rounded-2xl border border-[#382C24]">
             <button
               onClick={() => handleTabSwitch('portfolio')}
@@ -146,6 +147,16 @@ export default function App() {
               }`}
             >
               US Infrastructure Map
+            </button>
+            <button
+              onClick={() => handleTabSwitch('audit')}
+              className={`px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'audit'
+                  ? 'bg-[#E57A54] text-[#16110E] shadow-sm'
+                  : 'text-[#B5A698] hover:text-[#F7F2EB]'
+              }`}
+            >
+              Benchmarks &amp; Governance
             </button>
           </nav>
 
@@ -194,10 +205,15 @@ export default function App() {
             setIsHedged={setIsHedged}
             onGoToMap={handleGoToMap}
           />
-        ) : (
+        ) : activeTab === 'map' ? (
           <USInfrastructureMapTab
             profiles={profiles}
             initialSelectedTicker={focusedTicker}
+          />
+        ) : (
+          <JudgeAuditAndGovernanceTab
+            portfolioName={portfolioName}
+            profiles={profiles}
           />
         )}
       </main>

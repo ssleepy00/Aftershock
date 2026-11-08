@@ -202,6 +202,7 @@ def evaluate_logic_cases(cases: list, outputs_by_id: dict) -> dict:
             else:
                 failed.append({
                     "id": cid,
+                    "description": tc["description"],
                     "input": repr(tc["input"]),
                     "expected": json.dumps(expected),
                     "actual": json.dumps(actual),
@@ -222,6 +223,7 @@ def evaluate_logic_cases(cases: list, outputs_by_id: dict) -> dict:
                 else:
                     failed.append({
                         "id": cid,
+                        "description": tc["description"],
                         "input": json.dumps(tc["input"]),
                         "expected": json.dumps(exp),
                         "actual": json.dumps(actual_map),
@@ -235,6 +237,7 @@ def evaluate_logic_cases(cases: list, outputs_by_id: dict) -> dict:
                 else:
                     failed.append({
                         "id": cid,
+                        "description": tc["description"],
                         "input": json.dumps(tc["input"]),
                         "expected": json.dumps(exp),
                         "actual": json.dumps(actual_order),
@@ -256,6 +259,7 @@ def evaluate_logic_cases(cases: list, outputs_by_id: dict) -> dict:
                 else:
                     failed.append({
                         "id": cid,
+                        "description": tc["description"],
                         "input": json.dumps(tc["input"]),
                         "expected": f"max_abs_delta <= {exp['max_abs_delta_lte']} pts, turnover <= {exp['turnover_lte']}%, sum == 100.0%",
                         "actual": f"max_abs_delta = {max_delta} pts, turnover = {turnover}%, sum = {sum_hedged}%, weights = {[(p['ticker'], p['weight'], p['hedgedWeight']) for p in profiles]}",
@@ -270,6 +274,7 @@ def evaluate_logic_cases(cases: list, outputs_by_id: dict) -> dict:
                 else:
                     failed.append({
                         "id": cid,
+                        "description": tc["description"],
                         "input": json.dumps(tc["input"]),
                         "expected": json.dumps(exp),
                         "actual": json.dumps(actual_map),
@@ -283,6 +288,7 @@ def evaluate_logic_cases(cases: list, outputs_by_id: dict) -> dict:
                 else:
                     failed.append({
                         "id": cid,
+                        "description": tc["description"],
                         "input": json.dumps(tc["input"]),
                         "expected": f"sum(hedgedWeight) == {exp}%",
                         "actual": f"sum(hedgedWeight) == {sum_hedged}%",
@@ -304,6 +310,7 @@ def evaluate_logic_cases(cases: list, outputs_by_id: dict) -> dict:
                 else:
                     failed.append({
                         "id": cid,
+                        "description": tc["description"],
                         "input": json.dumps(tc["input"]),
                         "expected": f"{exp['decrease']} hedgedWeight < weight AND {exp['increase']} hedgedWeight > weight",
                         "actual": json.dumps({k: (v["weight"], v["hedgedWeight"]) for k, v in by_t.items()}),
@@ -323,6 +330,7 @@ def evaluate_logic_cases(cases: list, outputs_by_id: dict) -> dict:
                 else:
                     failed.append({
                         "id": cid,
+                        "description": tc["description"],
                         "input": json.dumps(tc["input"]),
                         "expected": "hedged unpricedRiskPct, sharpeRatio, and maxDrawdownPct strictly better than current",
                         "actual": json.dumps({"current": cur, "hedged": hdg}),
@@ -340,6 +348,7 @@ def evaluate_logic_cases(cases: list, outputs_by_id: dict) -> dict:
                 else:
                     failed.append({
                         "id": cid,
+                        "description": tc["description"],
                         "input": json.dumps(tc["input"]),
                         "expected": json.dumps(exp),
                         "actual": json.dumps({
@@ -357,6 +366,7 @@ def evaluate_logic_cases(cases: list, outputs_by_id: dict) -> dict:
                 else:
                     failed.append({
                         "id": cid,
+                        "description": tc["description"],
                         "input": json.dumps(tc["input"]),
                         "expected": f"hedged.exposureScore < current.exposureScore ({cur_s})",
                         "actual": f"hedged.exposureScore == {hdg_s}",
@@ -377,6 +387,7 @@ def evaluate_logic_cases(cases: list, outputs_by_id: dict) -> dict:
                 else:
                     failed.append({
                         "id": cid,
+                        "description": tc["description"],
                         "input": json.dumps(tc["input"]),
                         "expected": json.dumps(exp),
                         "actual": f"min_weight={min_w}, max_delta={max_d:.2f}, turnover={turnover:.2f}",

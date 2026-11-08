@@ -17,7 +17,7 @@
  *    informational telemetry for auditing and debugging.
  */
 
-import { logFunctionCall } from '../../utils/logger';
+import { logFunctionCall } from '../../utils/logger.ts';
 
 export const RESERVED_CSV_WORDS = new Set([
   'TICKER',
@@ -90,7 +90,7 @@ export function parsePortfolioText(
     if (RESERVED_CSV_WORDS.has(ticker)) continue;
 
     const weight = parseFloat(match[2]);
-    if (!Number.isFinite(weight) || weight <= 0 || weight > 1000) continue;
+    if (!Number.isFinite(weight) || weight <= 0 || weight > 1e12) continue;
 
     totals.set(ticker, Number(((totals.get(ticker) || 0) + weight).toFixed(4)));
   }

@@ -26,20 +26,25 @@ Adhering strictly to modern software engineering guidelines, Aftershock follows 
 │   │   ├── logger.ts                        # Centralized logger (function tracing & sanitized GenAI logs)
 │   │   └── spatialProjection.ts             # 2D cartographic SVG projection & collision offset engine
 │   ├── features/
+│   │   ├── agent/
+│   │   │   └── stockResearchAgent.ts        # 5-step Agentic Stock Research & Verification Loop
 │   │   ├── portfolio/
 │   │   │   ├── types.ts                     # Domain interfaces, hazard types, and metric models
 │   │   │   ├── stockDatabase.ts             # 38 verified facilities, stock database, and portfolio presets
 │   │   │   ├── portfolioParser.ts           # Resilient CSV, TSV, and text ingestion parser
-│   │   │   ├── portfolioOptimizer.ts        # Constrained hedge optimizer (delta and turnover caps)
+│   │   │   ├── portfolioOptimizer.ts        # Constrained hedge optimizer & deterministic guardrail verifier
 │   │   │   └── metricsCalculator.ts         # Dual-state physical risk and financial performance metrics
+│   │   ├── audit/
+│   │   │   └── traceableMathEngine.ts       # Per-stock math traces, declared benchmarks & stress simulator
 │   │   └── export/
 │   │       ├── markdownExporter.ts          # Institutional Markdown report generator
 │   │       ├── csvExporter.ts               # Multi-section tabular CSV report generator
 │   │       ├── jsonExporter.ts              # Machine-readable structured JSON serializer
 │   │       └── fileDownloader.ts            # Client-side blob provisioning and download trigger
 │   ├── components/
-│   │   ├── PortfolioUploadTab.tsx           # Dropzone, multimodal upload, and executive risk metrics
+│   │   ├── PortfolioUploadTab.tsx           # Dropzone, live unseen ticker input, stress bar & Trace Math UI
 │   │   ├── USInfrastructureMapTab.tsx       # Interactive US SVG hazard map & facility deep-dive
+│   │   ├── JudgeAuditAndGovernanceTab.tsx   # Declared benchmarks, live hold-out runner & governance matrix
 │   │   └── PortfolioExportModal.tsx         # Multi-format report preview, copy, and export dialog
 │   ├── data/
 │   │   └── aftershockData.ts                # Central re-export hub for backward compatibility
@@ -55,7 +60,7 @@ All system-wide configurable parameters, model identifiers, physical bounds, and
 
 - **Server & AI Model**:
   - `DEFAULT_PORT`: `3000` (overridden by `process.env.PORT` when deployed).
-  - `GEMINI_VISION_MODEL`: `'gemini-3.8-flash'` for multimodal image & screenshot extraction.
+  - `GEMINI_VISION_MODEL`: `'gemini-3.8-flash'` for multimodal image & screenshot extraction and unseen ticker resolution.
   - `BODY_LIMIT`: `'15mb'` to accommodate high-resolution brokerage screenshots.
 - **Risk & Optimization Guardrails (Spec Layer 04)**:
   - `MAX_DELTA_PER_STOCK`: `5.0` percentage points (maximum position change per equity).
@@ -70,28 +75,40 @@ All system-wide configurable parameters, model identifiers, physical bounds, and
 
 ---
 
-## 4. Structured Observability & Telemetry (`src/utils/logger.ts`)
+## 4. Structured Observability, Governance & Data Privacy (`src/utils/logger.ts`)
 
-Aftershock implements enterprise-grade observability:
+Aftershock enforces strict observability and risk controls proportionate to institutional portfolio management:
 1. **Function Call Tracing (`logFunctionCall`)**:
    - Emits structured info logs containing the function name and caller-supplied parameters.
-   - Detects piped execution environments (`process.stdout.isTTY === undefined`) and automatically redirects logs to `process.stderr` so machine-to-machine JSON pipelines (such as `agentverse/finance/bench.py`) remain completely unpolluted.
+   - Detects piped execution environments (`process.stdout.isTTY === undefined`) and automatically redirects logs to `process.stderr` so machine-to-machine JSON pipelines (such as `agentverse/finance/bench.py`) remain unpolluted.
 2. **Generative AI Call Tracing (`logGenAiCall`)**:
    - Captures target model, generation configuration, prompt text, and responses.
-   - Strips inline binary data (`inlineData.data` base64 strings) via `sanitizePromptPartsForLogging` to prevent log bloating while preserving prompt auditing.
+   - Strips inline binary data (`inlineData.data` base64 strings) via `sanitizePromptPartsForLogging` to prevent log bloating and protect uploaded visual snapshots.
+3. **Autonomy Boundaries, Model Execution Locations & Data Egress**:
+   - **What the Agent May Do Alone (Read-Only Scope)**: Extract tickers/weights from uploaded snapshots, map corporate facilities against federal hazard datasets, and compute candidate bounded waterfilling allocations.
+   - **What Requires Human Approval (Human Gate)**: Every risk-hedged portfolio recommendation is verified deterministically via `verifyPortfolioGuardrails` and requires explicit analyst sign-off via the **Human Approval Gate**. Aftershock has zero autonomous brokerage order-routing or trade execution capability.
+   - **Where Each Model & Engine Runs**:
+     - *In-Browser Client (100% Local TypeScript)*: CSV/text parsing (`parsePortfolioText`), bounded waterfilling optimization (`buildPortfolioProfiles`), risk/Sharpe/Sortino/CVaR calculation (`computePortfolioMetrics`), traceable math derivations (`computeHoldingReasoningTraces`), and catastrophe stress simulations (`evaluateStressScenario`).
+     - *Server-Side Cloud API (`gemini-3.8-flash`)*: Invoked strictly for multimodal screenshot extraction (`/api/portfolio/extract-upload`) and the multi-step Agentic Stock Infrastructure Research Loop (`/api/portfolio/resolve-unseen-ticker`).
+   - **What User Data Leaves the Device**: Preset selections, map interactions, stress tests, and report exports never leave the client browser. Uploaded screenshots/files are transmitted over HTTPS for ephemeral extraction with zero persistent disk or database storage.
 
 ---
 
 ## 5. Core Application Features
 
-### 5.1 Multimodal Ingestion & Vision Extraction
+### 5.1 Multimodal Ingestion, Vision Extraction & 5-Step Agentic Stock Research Loop
 - **Drag-and-Drop Zone**: Accepts PNG/JPG brokerage screenshots, pie charts, and tabular files.
 - **Live Gemini Vision Extractor (`gemini-3.8-flash`)**: Translates visual pie slices or brokerage tables into standard US tickers and weights via structured JSON schema enforcement. Never returns mocked or hardcoded JSON fallback payloads—if `GEMINI_API_KEY` is missing or an image contains no valid holdings, the server returns explicit HTTP `422`/`502`/`503` errors surfaced directly in the UI.
+- **5-Step Agentic Stock Infrastructure Research & Verification Loop (`src/features/agent/stockResearchAgent.ts`)**: Resolves arbitrary unseen US tickers (e.g., `TSM`, `ASML`, `PLD`, `VST`, `DUK`) through a traceable 5-step workflow:
+  1. `lookup_sec_edgar_company`: Queries the live US SEC EDGAR company registry (`sec.gov/files/company_tickers.json` and `data.sec.gov/submissions/CIK...`) for CIK, legal name, SIC industry classification, and headquarters state.
+  2. `ground_company_us_facilities`: Invokes Gemini (`gemini-3.8-flash`) with function-calling tool declarations to formulate an investigation plan and identify 3 physical US facilities (Corporate HQ, Data Center, Power Supply, or Wafer Fab).
+  3. `query_fema_usgs_county_hazard`: Cross-references each facility's city/state against `agentverse/finance/public_data_reference.json` and state FEMA NRI v1.19 / USGS NSHM 2023 baselines (FIPS code, coordinates, Peak Ground Acceleration in g, and hurricane/seismic rating).
+  4. `calculate_deterministic_stock_risk`: Computes facility-level `unpricedImpactPct`, composite `exposureScore` (/100), `unpricedRiskPct`, and `maxEventDrawdownPct` deterministically in TypeScript (never trusting LLM-generated arithmetic).
+  5. `verify_profile_guardrails`: Runs a deterministic verification gate confirming continental US coordinate bounds and the exact rollup invariant (`sum(site.unpricedImpactPct) === stock.unpricedRiskPct`).
 - **Deterministic Text Parser (`parsePortfolioText`)**: Resilient regex engine handling CSV, TSV, colon/equals syntax, stripping numbered list prefixes, and ignoring standard financial headers.
 
-
 ### 5.2 Curated Federal Infrastructure Roster (`STOCK_DATABASE`)
-- 38 physical facilities spanning 13 major equities (`NVDA`, `MSFT`, `AMZN`, `META`, `GOOGL`, `AAPL`, `TSLA`, `INTC`, `AMD`, `AVGO`, `ORCL`, `NEE`, `EQIX`, `XOM`).
+- 38 physical facilities spanning 14 major equities (`NVDA`, `MSFT`, `AMZN`, `META`, `GOOGL`, `AAPL`, `TSLA`, `INTC`, `AMD`, `AVGO`, `ORCL`, `NEE`, `EQIX`, `XOM`).
 - Physical classifications across four tiers:
   1. **Data Centers**: High-density AI computing clusters and hyperscale cloud nodes.
   2. **Power Supplies**: Dedicated nuclear stations, high-voltage ERCOT/PJM substations.
@@ -104,21 +121,22 @@ Aftershock implements enterprise-grade observability:
 - Transparent atmospheric hazard overlays for the **Atlantic/Gulf Hurricane Corridor** and **California Hayward/San Andreas Fault Belt**.
 - Real-time filtering by natural hazard type and facility asset category.
 
-### 5.4 Constrained Risk Hedge Optimizer & Deterministic Guardrail Verification (`buildPortfolioProfiles`, `verifyPortfolioGuardrails`)
-- Evaluates individual equity unpriced risk severity ($|s_i|$) against the portfolio mean severity ($\bar{s}$).
+### 5.4 Constrained Risk Hedge Optimizer & Traceable Reasoning (`portfolioOptimizer.ts`, `traceableMathEngine.ts`)
+- Evaluates individual equity unpriced risk severity (`|s_i|`) against the portfolio severity threshold (`s_threshold`).
 - Uses bounded proportional waterfilling (`allocateBounded`) to shift weight from over-exposed equities to defensive holdings.
+- **Per-Holding "Trace Math" Audit Drawer (`computeHoldingReasoningTraces`)**: Shows the exact facility-level rollup equation, severity spread, waterfilling priority share %, individual ±5.0 pt cap check, and final weight adjustment alongside every holding.
 - **Deterministic Guardrail Verification (`verifyPortfolioGuardrails`)**:
-  - $|w_{\text{hedged}, i} - w_{\text{current}, i}| \le 5.0$ percentage points (`passedDeltaCap`).
-  - $0.5 \times \sum |w_{\text{hedged}, i} - w_{\text{current}, i}| \le 15.0\%$ (`passedTurnoverCap`).
-  - All weights $\ge 0\%$ (`passedLongOnly`) and $\sum w_i = 100.0\%$ (`passedWeightSum`).
-- **Human Approval Gate (Advisory Only)**:
-  - All risk-hedged portfolio proposals are strictly advisory decision-support outputs with zero autonomous trading execution, gated by an explicit human analyst approval check in the UI.
+  - Single-stock weight shift `|w_hedged - w_current| ≤ 5.0` percentage points (`passedDeltaCap`).
+  - One-way portfolio turnover `0.5 × sum(|w_hedged - w_current|) ≤ 15.0%` (`passedTurnoverCap`).
+  - All weights `≥ 0%` (`passedLongOnly`) and total portfolio weight `= 100.0%` (`passedWeightSum`).
+- **Physical Catastrophe Stress Simulator (`evaluateStressScenario`)**: Deterministically simulates **USGS M7.1 Hayward Fault Rupture**, **NOAA Cat-4 Gulf/Atlantic Hurricane Landfall**, and **EIA ERCOT/PJM Dual-Grid Mega-Outage** scenarios across all mapped corporate facilities.
 
-### 5.5 Institutional Risk & Performance Metrics (`computePortfolioMetrics`)
+### 5.5 Institutional Risk Metrics & Declared Benchmarks (`metricsCalculator.ts`, `JudgeAuditAndGovernanceTab.tsx`)
 - **Exposure Score (0-100)**: Points aggregated from facility types plus regional corridor clustering penalties.
 - **Unpriced Risk Drag**: Projected equity discount due to unpriced physical hazard vulnerability.
-- **Sharpe & Sortino Ratios**: Risk-adjusted returns net of institutional turnover transaction costs.
+- **Sharpe & Sortino Ratios**: Risk-adjusted returns net of institutional turnover transaction costs (18 bps per 100% turnover).
 - **99% Tail CVaR & Max Event Drawdown**: Simulated 1-in-100 year disaster portfolio losses.
+- **Declared Benchmark Suite (`computeDeclaredBenchmarks`)**: Compares (1) Current Baseline, (2) Aftershock Constrained Hedge, (3) Equal-Weight (1/N) Naive Benchmark, and (4) Unconstrained Inverse-Hazard Rebalance.
 
 ### 5.6 Comprehensive Export Subsystem (`src/features/export/*`)
 - **Markdown (.md)**: Executive report with comparative metric tables, exposure score justifications, and citations.
@@ -145,7 +163,7 @@ All facility hazards, coordinates, and power capacities are verified against off
 
 ## 7. Verification & Benchmarking Workflow
 
-The codebase undergoes automated verification via the `agentverse/finance/bench.py` test suite:
+The codebase undergoes automated verification via `agentverse/finance/bench.py` (accessible both via CLI and live in the UI via `GET /api/audit/run-benchmark` in the **Benchmarks & Governance** tab):
 - **Real-Data Audit**: Verifies all 38 facilities against public data reference benchmarks.
-- **Logic Suite**: Tests 25 hand-calculated practice cases and 15 unseen hold-out scenarios, validating parser resilience, hedge bounds, and metrics integrity.
+- **Logic Suite**: Tests 25 hand-calculated calibration cases and 100 unseen out-of-sample hold-out scenarios (`H01`–`H100`), validating parser resilience, unseen ticker generalization, hedge bounds, and metrics integrity.
 - **Linting & Compilation**: Monitored via TypeScript compiler checks (`tsc -b`) and ESLint.

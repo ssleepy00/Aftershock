@@ -21,17 +21,21 @@
  *    - Logs function calls and runtime parameters via src/utils/logger.ts.
  */
 
-import express, { Request, Response } from 'express';
+import express from 'express';
+import type { Request, Response } from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import fs from 'fs';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
-import { CONFIG } from './src/config/appConfig';
-import { logFunctionCall, logGenAiCall } from './src/utils/logger';
+import { CONFIG } from './src/config/appConfig.ts';
+import { logFunctionCall, logGenAiCall } from './src/utils/logger.ts';
 
 dotenv.config();
 
+const execFileAsync = promisify(execFile);
 const PORT = Number(process.env.PORT) || CONFIG.SERVER.DEFAULT_PORT;
 
 /**
@@ -83,9 +87,24 @@ async function startServer(): Promise<void> {
         language: 'tsx',
       },
       {
+        path: 'src/components/JudgeAuditAndGovernanceTab.tsx',
+        label: 'src/components/JudgeAuditAndGovernanceTab.tsx',
+        language: 'tsx',
+      },
+      {
         path: 'src/components/PortfolioExportModal.tsx',
         label: 'src/components/PortfolioExportModal.tsx',
         language: 'tsx',
+      },
+      {
+        path: 'src/features/agent/stockResearchAgent.ts',
+        label: 'src/features/agent/stockResearchAgent.ts',
+        language: 'typescript',
+      },
+      {
+        path: 'src/features/audit/traceableMathEngine.ts',
+        label: 'src/features/audit/traceableMathEngine.ts',
+        language: 'typescript',
       },
       {
         path: 'src/data/aftershockData.ts',
@@ -248,6 +267,75 @@ Return between 2 and 10 holdings.`,
     }
   });
 
+  // Multi-step Agentic resolution of unseen stock tickers (SEC EDGAR + Gemini Tool Call + FEMA/USGS Grounding + Deterministic Math + Verification Gate)
+  app.post('/api/portfolio/resolve-unseen-ticker', async (req: Request, res: Response) => {
+    const { ticker } = req.body as { ticker?: string };
+    const cleanTicker = (ticker || '').toUpperCase().trim().replace(/[^A-Z.]/g, '');
+
+    logFunctionCall('POST /api/portfolio/resolve-unseen-ticker', { ticker: cleanTicker });
+
+    if (!cleanTicker || cleanTicker.length > 6) {
+      return res.status(400).json({ error: 'Please provide a valid US stock ticker symbol (1-6 letters).' });
+    }
+
+    const ai = getGenAIClient();
+    if (!ai) {
+      return res.status(503).json({
+        error: 'GEMINI_API_KEY is required on the server to run the multi-step agentic stock research workflow.',
+      });
+    }
+
+    try {
+      const { runAgenticStockResearch } = await import(
+        './src/features/agent/stockResearchAgent.ts'
+      );
+      const result = await runAgenticStockResearch(ai, cleanTicker);
+      return res.json(result);
+    } catch (err: any) {
+      return res.status(502).json({
+        error: `Agentic stock research failed for ${cleanTicker}: ${err?.message || 'Unknown error'}`,
+      });
+    }
+  });
+
+  // Live execution of the Practice & Unseen Hold-Out Benchmark Suite for judge verification
+  app.get('/api/audit/run-benchmark', async (_req: Request, res: Response) => {
+    logFunctionCall('GET /api/audit/run-benchmark', {});
+
+    const runBenchSuite = async (suiteName: 'practice' | 'holdout') => {
+      try {
+        const { stdout } = await execFileAsync(
+          'python3',
+          ['agentverse/finance/bench.py', '--suite', suiteName],
+          { cwd: process.cwd(), timeout: 15000 }
+        );
+        return JSON.parse(stdout);
+      } catch (err: any) {
+        if (err?.stdout) {
+          return JSON.parse(err.stdout);
+        }
+        throw err;
+      }
+    };
+
+    try {
+      const [practiceJson, holdoutJson] = await Promise.all([
+        runBenchSuite('practice'),
+        runBenchSuite('holdout'),
+      ]);
+
+      return res.json({
+        timestamp: new Date().toISOString(),
+        practice: practiceJson,
+        holdout: holdoutJson,
+      });
+    } catch (err: any) {
+      return res.status(500).json({
+        error: `Benchmark execution failed: ${err?.message || 'Unknown error'}`,
+      });
+    }
+  });
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -268,3 +356,4 @@ Return between 2 and 10 holdings.`,
 }
 
 startServer();
+

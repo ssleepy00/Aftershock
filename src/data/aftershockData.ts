@@ -23,7 +23,7 @@ export type {
   PortfolioMetricsSnapshot,
   PortfolioMetricsComparison,
   PortfolioPreset,
-} from '../features/portfolio/types';
+} from '../features/portfolio/types.ts';
 
 export {
   STOCK_DATABASE,
@@ -31,21 +31,40 @@ export {
   PORTFOLIO_PRESETS,
   getStockRiskProfile,
   getPresetPortfolios,
-} from '../features/portfolio/stockDatabase';
+} from '../features/portfolio/stockDatabase.ts';
 
 export {
   parsePortfolioText,
   RESERVED_CSV_WORDS,
   type ParsedPortfolioHolding,
-} from '../features/portfolio/portfolioParser';
+} from '../features/portfolio/portfolioParser.ts';
 
 export {
   buildPortfolioProfiles,
   allocateBounded,
   verifyPortfolioGuardrails,
+  registerDynamicStockProfile,
+  DYNAMIC_TICKER_PROFILES,
   type GuardrailVerificationResult,
-} from '../features/portfolio/portfolioOptimizer';
+} from '../features/portfolio/portfolioOptimizer.ts';
 
 export {
   computePortfolioMetrics,
-} from '../features/portfolio/metricsCalculator';
+} from '../features/portfolio/metricsCalculator.ts';
+
+export {
+  computeHoldingReasoningTraces,
+  computeDeclaredBenchmarks,
+  evaluateStressScenario,
+  STRESS_SCENARIOS,
+  type HoldingReasoningTrace,
+  type DeclaredBenchmarkRow,
+  type StressScenarioDefinition,
+  type StressScenarioEvaluation,
+} from '../features/audit/traceableMathEngine.ts';
+
+export type {
+  AgentStepTrace,
+  AgenticStockResearchResult,
+} from '../features/agent/stockResearchAgent.ts';
+

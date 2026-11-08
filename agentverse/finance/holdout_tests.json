@@ -5,8 +5,14 @@
     "description": "Pipe-delimited markdown table with header and alignment row",
     "input": "Symbol | Weight\n--- | ---\nTSLA | 55.5%\nORCL | 44.5%",
     "expected": [
-      { "ticker": "TSLA", "weight": 55.5 },
-      { "ticker": "ORCL", "weight": 44.5 }
+      {
+        "ticker": "TSLA",
+        "weight": 55.5
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 44.5
+      }
     ],
     "requirement": "CSV parser must handle pipe-delimited markdown tables and skip separator lines."
   },
@@ -16,9 +22,18 @@
     "description": "Colon-separated key-value list with mixed casing",
     "input": "eqix: 30\nxom: 30\nnee: 40",
     "expected": [
-      { "ticker": "EQIX", "weight": 30.0 },
-      { "ticker": "XOM", "weight": 30.0 },
-      { "ticker": "NEE", "weight": 40.0 }
+      {
+        "ticker": "EQIX",
+        "weight": 30.0
+      },
+      {
+        "ticker": "XOM",
+        "weight": 30.0
+      },
+      {
+        "ticker": "NEE",
+        "weight": 40.0
+      }
     ],
     "requirement": "CSV parser must support colon-delimited key:value pairs."
   },
@@ -28,8 +43,14 @@
     "description": "Comment lines (#) and blank lines interspersed with holdings",
     "input": "# Q4 Institutional Portfolio\n\nINTC, 25\n# Core Cloud\nAMZN, 75\n",
     "expected": [
-      { "ticker": "INTC", "weight": 25.0 },
-      { "ticker": "AMZN", "weight": 75.0 }
+      {
+        "ticker": "INTC",
+        "weight": 25.0
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 75.0
+      }
     ],
     "requirement": "CSV parser must skip comment lines starting with # and blank lines."
   },
@@ -39,8 +60,14 @@
     "description": "Three duplicate entries of the same single-letter ticker (C) summed with AAPL",
     "input": "C, 10\nAAPL, 70\nC, 12.5\nC, 7.5",
     "expected": [
-      { "ticker": "C", "weight": 30.0 },
-      { "ticker": "AAPL", "weight": 70.0 }
+      {
+        "ticker": "C",
+        "weight": 30.0
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 70.0
+      }
     ],
     "requirement": "CSV parser must sum 3+ occurrences of a 1-letter ticker."
   },
@@ -50,159 +77,2850 @@
     "description": "Numbered list with parenthesis 1) and 2) prefixes",
     "input": "1) GOOGL 48.2%\n2) AMD 51.8%",
     "expected": [
-      { "ticker": "GOOGL", "weight": 48.2 },
-      { "ticker": "AMD", "weight": 51.8 }
+      {
+        "ticker": "GOOGL",
+        "weight": 48.2
+      },
+      {
+        "ticker": "AMD",
+        "weight": 51.8
+      }
     ],
     "requirement": "CSV parser must strip numbered list prefixes like '1)' and '2)' without mistaking the index for weight."
   },
   {
     "id": "H06",
-    "type": "portfolio_logic",
-    "description": "Unnormalized basis-point style weights [250, 250, 500] normalize to [25.0, 25.0, 50.0]",
-    "input": [
-      { "ticker": "NEE", "weight": 250 },
-      { "ticker": "EQIX", "weight": 250 },
-      { "ticker": "MSFT", "weight": 500 }
+    "type": "csv_parser",
+    "description": "Semicolon-delimited European-style export with unseen semiconductor tickers",
+    "input": "Ticker;Allocation\nTSM;45.0\nASML;35.0\nMU;20.0",
+    "expected": [
+      {
+        "ticker": "TSM",
+        "weight": 45.0
+      },
+      {
+        "ticker": "ASML",
+        "weight": 35.0
+      },
+      {
+        "ticker": "MU",
+        "weight": 20.0
+      }
     ],
-    "check": "normalize_weights",
-    "expected": { "NEE": 25.0, "EQIX": 25.0, "MSFT": 50.0 },
-    "requirement": "buildPortfolioProfiles must normalize arbitrary positive weight scales to 100.0%."
+    "requirement": "CSV parser must parse semicolon-delimited rows and skip 'Ticker;Allocation' header."
   },
   {
     "id": "H07",
-    "type": "portfolio_logic",
-    "description": "Strict sorting on 7-stock portfolio across all hazard tiers",
-    "input": [
-      { "ticker": "MSFT", "weight": 15 },
-      { "ticker": "ORCL", "weight": 15 },
-      { "ticker": "AAPL", "weight": 15 },
-      { "ticker": "AMD", "weight": 15 },
-      { "ticker": "NVDA", "weight": 15 },
-      { "ticker": "XOM", "weight": 15 },
-      { "ticker": "NEE", "weight": 10 }
+    "type": "csv_parser",
+    "description": "Equals-sign assignment syntax with unseen utility & REIT tickers",
+    "input": "PLD = 40%\nVST = 35%\nDUK = 25%",
+    "expected": [
+      {
+        "ticker": "PLD",
+        "weight": 40.0
+      },
+      {
+        "ticker": "VST",
+        "weight": 35.0
+      },
+      {
+        "ticker": "DUK",
+        "weight": 25.0
+      }
     ],
-    "check": "sorted_order",
-    "expected": ["NEE", "XOM", "NVDA", "AMD", "AAPL", "ORCL", "MSFT"],
-    "requirement": "Holdings must be strictly ordered from most negative unpricedRiskPct (-2.1%) to least (-0.4%)."
+    "requirement": "CSV parser must parse equals-sign key=value assignments."
   },
   {
     "id": "H08",
-    "type": "portfolio_logic",
-    "description": "Asymmetric 4-to-1 portfolio: 4 high-risk stocks (20% each) and 1 low-risk stock (MSFT 20%) limited by MSFT's +5.0 pt cap -> total turnover = 5.0%",
-    "input": [
-      { "ticker": "NEE", "weight": 20 },
-      { "ticker": "EQIX", "weight": 20 },
-      { "ticker": "XOM", "weight": 20 },
-      { "ticker": "TSLA", "weight": 20 },
-      { "ticker": "MSFT", "weight": 20 }
+    "type": "csv_parser",
+    "description": "Tab-separated institutional custody export with quoted symbols",
+    "input": "\"Symbol\"\t\"Weight\"\n\"NVDA\"\t\"32.5\"\n\"MSFT\"\t\"67.5\"",
+    "expected": [
+      {
+        "ticker": "NVDA",
+        "weight": 32.5
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 67.5
+      }
     ],
-    "check": "exact_turnover_tx",
-    "expected": { "turnoverPct": 5.0, "transactionCostPct": 0.01 },
-    "requirement": "When only 1 low-risk stock is available to absorb reallocated weight, its +5.0 pt cap limits total portfolio one-way turnover to 5.0%."
+    "requirement": "CSV parser must strip double quotes around tickers and weights in TSV exports."
   },
   {
     "id": "H09",
-    "type": "portfolio_logic",
-    "description": "Asymmetric 1-to-4 portfolio: 1 high-risk stock (NEE 40%) and 4 low-risk stocks (15% each) limited by NEE's -5.0 pt cap -> NEE hedgedWeight = 35.0%",
-    "input": [
-      { "ticker": "NEE", "weight": 40 },
-      { "ticker": "MSFT", "weight": 15 },
-      { "ticker": "ORCL", "weight": 15 },
-      { "ticker": "AAPL", "weight": 15 },
-      { "ticker": "AMD", "weight": 15 }
+    "type": "csv_parser",
+    "description": "Single-quoted tickers with negative and zero weights filtered out",
+    "input": "'AVGO', 55\n'INTC', -10\n'AMD', 0\n'ORCL', 45",
+    "expected": [
+      {
+        "ticker": "AVGO",
+        "weight": 55.0
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 45.0
+      }
     ],
-    "check": "max_delta_and_turnover",
-    "expected": { "max_abs_delta_lte": 5.0, "turnover_lte": 5.0 },
-    "requirement": "When only 1 high-risk stock is trimmed, its -5.0 pt cap limits total one-way turnover to 5.0%."
+    "requirement": "CSV parser must ignore non-positive weights (<= 0) while preserving valid single-quoted tickers."
   },
   {
     "id": "H10",
-    "type": "portfolio_logic",
-    "description": "12-stock broad portfolio obeys both <= 5.0 pt stock delta and <= 15.0% turnover cap",
-    "input": [
-      { "ticker": "NEE", "weight": 9 },
-      { "ticker": "EQIX", "weight": 9 },
-      { "ticker": "XOM", "weight": 9 },
-      { "ticker": "TSLA", "weight": 9 },
-      { "ticker": "NVDA", "weight": 9 },
-      { "ticker": "INTC", "weight": 9 },
-      { "ticker": "META", "weight": 8 },
-      { "ticker": "AMZN", "weight": 8 },
-      { "ticker": "GOOGL", "weight": 8 },
-      { "ticker": "AMD", "weight": 8 },
-      { "ticker": "ORCL", "weight": 7 },
-      { "ticker": "MSFT", "weight": 7 }
+    "type": "csv_parser",
+    "description": "Multi-account aggregation summing duplicate unseen tickers (TSM and PLD)",
+    "input": "TSM: 15.5\nPLD: 20.0\nTSM: 14.5\nPLD: 30.0\nMSFT: 20.0",
+    "expected": [
+      {
+        "ticker": "TSM",
+        "weight": 30.0
+      },
+      {
+        "ticker": "PLD",
+        "weight": 50.0
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 20.0
+      }
     ],
-    "check": "max_delta_and_turnover",
-    "expected": { "max_abs_delta_lte": 5.0, "turnover_lte": 15.0 },
-    "requirement": "12-stock portfolio must strictly satisfy |delta_i| <= 5.0 and turnover <= 15.0%."
+    "requirement": "CSV parser must aggregate duplicate unseen tickers across multiple lines."
   },
   {
     "id": "H11",
-    "type": "portfolio_logic",
-    "description": "Tiny high-risk weight (NEE 1.5%, XOM 48.5%, MSFT 50.0%) clamps NEE reduction at 1.5% (hedgedWeight = 0.0%)",
-    "input": [
-      { "ticker": "NEE", "weight": 1.5 },
-      { "ticker": "XOM", "weight": 48.5 },
-      { "ticker": "MSFT", "weight": 50.0 }
+    "type": "csv_parser",
+    "description": "Two-digit numbered list (10. and 11.) prefix stripping",
+    "input": "10. CEG 60%\n11. DLR 40%",
+    "expected": [
+      {
+        "ticker": "CEG",
+        "weight": 60.0
+      },
+      {
+        "ticker": "DLR",
+        "weight": 40.0
+      }
     ],
-    "check": "non_negative_and_caps",
-    "expected": { "min_weight_gte": 0.0, "max_abs_delta_lte": 5.0, "turnover_lte": 15.0 },
-    "requirement": "A high-risk stock with initial weight < 5.0% must be clamped at 0.0% without going negative."
+    "requirement": "CSV parser must strip multi-digit numbered list prefixes without capturing the line number as weight."
   },
   {
     "id": "H12",
-    "type": "portfolio_logic",
-    "description": "Dominant low-risk stock (NEE 3%, MSFT 97%) clamps MSFT increase at +3.0% so MSFT <= 100.0%",
-    "input": [
-      { "ticker": "NEE", "weight": 3.0 },
-      { "ticker": "MSFT", "weight": 97.0 }
+    "type": "csv_parser",
+    "description": "Single-letter NYSE tickers (F, V, C) in whitespace-separated table",
+    "input": "F 25.0\nV 50.0\nC 25.0",
+    "expected": [
+      {
+        "ticker": "F",
+        "weight": 25.0
+      },
+      {
+        "ticker": "V",
+        "weight": 50.0
+      },
+      {
+        "ticker": "C",
+        "weight": 25.0
+      }
     ],
-    "check": "exact_hedged_weights",
-    "expected": { "NEE": 0.0, "MSFT": 100.0 },
-    "requirement": "When weight is 97.0% and 3.0%, hedging shifts at most 3.0% so weights stay within [0, 100]."
+    "requirement": "CSV parser must support multiple 1-letter tickers in whitespace-separated format."
   },
   {
     "id": "H13",
-    "type": "portfolio_logic",
-    "description": "Coastal Grid & Data REITs preset improves net Unpriced Risk, Sharpe, and Max Drawdown after tx costs",
-    "input": [
-      { "ticker": "NEE", "weight": 28 },
-      { "ticker": "EQIX", "weight": 24 },
-      { "ticker": "XOM", "weight": 22 },
-      { "ticker": "AMZN", "weight": 14 },
-      { "ticker": "MSFT", "weight": 12 }
+    "type": "csv_parser",
+    "description": "Header noise words (PORTFOLIO, TOTAL, USD, SHARES, VALUE) ignored",
+    "input": "PORTFOLIO, 100\nSHARES, 50\nVALUE, 25\nMETA, 45\nAMZN, 55\nTOTAL, 100",
+    "expected": [
+      {
+        "ticker": "META",
+        "weight": 45.0
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 55.0
+      }
     ],
-    "check": "metrics_improvement",
-    "expected": { "unpriced_improved": true, "sharpe_improved": true, "mdd_improved": true },
-    "requirement": "Hedged Coastal Grid & Data REITs portfolio must improve net Unpriced Risk, Sharpe, and Max Drawdown."
+    "requirement": "CSV parser must filter out reserved financial header/summary keywords."
   },
   {
     "id": "H14",
+    "type": "csv_parser",
+    "description": "Fractional basis-point precision weights (3 decimals)",
+    "input": "NVDA, 33.333%\nAAPL, 33.333%\nMSFT, 33.334%",
+    "expected": [
+      {
+        "ticker": "NVDA",
+        "weight": 33.333
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 33.333
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 33.334
+      }
+    ],
+    "requirement": "CSV parser must preserve decimal precision in parsed weights."
+  },
+  {
+    "id": "H15",
+    "type": "csv_parser",
+    "description": "Mixed delimiter stress test (comma, colon, pipe, equals, tab)",
+    "input": "NVDA, 20\nEQIX: 20\nNEE | 20\nXOM = 20\nMSFT\t20",
+    "expected": [
+      {
+        "ticker": "NVDA",
+        "weight": 20.0
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 20.0
+      },
+      {
+        "ticker": "NEE",
+        "weight": 20.0
+      },
+      {
+        "ticker": "XOM",
+        "weight": 20.0
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 20.0
+      }
+    ],
+    "requirement": "CSV parser must handle heterogeneous delimiters within the same text block."
+  },
+  {
+    "id": "H16",
+    "type": "csv_parser",
+    "description": "Four-letter Nasdaq semiconductor equipment tickers (KLAC, LRCX, AMAT, QCOM)",
+    "input": "KLAC, 25\nLRCX, 25\nAMAT, 25\nQCOM, 25",
+    "expected": [
+      {
+        "ticker": "KLAC",
+        "weight": 25.0
+      },
+      {
+        "ticker": "LRCX",
+        "weight": 25.0
+      },
+      {
+        "ticker": "AMAT",
+        "weight": 25.0
+      },
+      {
+        "ticker": "QCOM",
+        "weight": 25.0
+      }
+    ],
+    "requirement": "CSV parser must cleanly extract 4-letter unseen semiconductor equipment tickers."
+  },
+  {
+    "id": "H17",
+    "type": "csv_parser",
+    "description": "Cloud & cybersecurity tickers (PANW, SNOW, PLTR, DDOG)",
+    "input": "1. PANW : 30%\n2. SNOW : 25%\n3. PLTR : 25%\n4. DDOG : 20%",
+    "expected": [
+      {
+        "ticker": "PANW",
+        "weight": 30.0
+      },
+      {
+        "ticker": "SNOW",
+        "weight": 25.0
+      },
+      {
+        "ticker": "PLTR",
+        "weight": 25.0
+      },
+      {
+        "ticker": "DDOG",
+        "weight": 20.0
+      }
+    ],
+    "requirement": "CSV parser must handle numbered lists combined with colon delimiters."
+  },
+  {
+    "id": "H18",
+    "type": "csv_parser",
+    "description": "Windows CRLF line endings with trailing spaces and blank lines",
+    "input": "\r\n  TSLA , 42.5%  \r\n\r\n  GOOGL , 57.5%  \r\n",
+    "expected": [
+      {
+        "ticker": "TSLA",
+        "weight": 42.5
+      },
+      {
+        "ticker": "GOOGL",
+        "weight": 57.5
+      }
+    ],
+    "requirement": "CSV parser must handle CRLF line endings and leading/trailing whitespace."
+  },
+  {
+    "id": "H19",
+    "type": "csv_parser",
+    "description": "Unnormalized dollar notional values in CSV parser",
+    "input": "Ticker,BasisPoints\nNEE,150\nEQIX,350\nMSFT,500",
+    "expected": [
+      {
+        "ticker": "NEE",
+        "weight": 150.0
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 350.0
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 500.0
+      }
+    ],
+    "requirement": "CSV parser must extract raw positive numeric values for downstream normalization."
+  },
+  {
+    "id": "H20",
+    "type": "csv_parser",
+    "description": "Four duplicate tranches of NVDA across tax lots",
+    "input": "NVDA 10.5\nNVDA 14.5\nNVDA 25.0\nNVDA 10.0\nORCL 40.0",
+    "expected": [
+      {
+        "ticker": "NVDA",
+        "weight": 60.0
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 40.0
+      }
+    ],
+    "requirement": "CSV parser must sum 4 separate tax-lot lines for the same ticker."
+  },
+  {
+    "id": "H21",
+    "type": "csv_parser",
+    "description": "Lower-case unseen utility tickers (duk, so, aep, pcg)",
+    "input": "duk, 25\nso, 25\naep, 25\npcg, 25",
+    "expected": [
+      {
+        "ticker": "DUK",
+        "weight": 25.0
+      },
+      {
+        "ticker": "SO",
+        "weight": 25.0
+      },
+      {
+        "ticker": "AEP",
+        "weight": 25.0
+      },
+      {
+        "ticker": "PCG",
+        "weight": 25.0
+      }
+    ],
+    "requirement": "CSV parser must uppercase all extracted unseen utility tickers."
+  },
+  {
+    "id": "H22",
+    "type": "csv_parser",
+    "description": "Markdown table with leading and trailing outer pipes",
+    "input": "| Ticker | Weight |\n| :--- | ---: |\n| AVGO | 62.0% |\n| AMD | 38.0% |",
+    "expected": [
+      {
+        "ticker": "AVGO",
+        "weight": 62.0
+      },
+      {
+        "ticker": "AMD",
+        "weight": 38.0
+      }
+    ],
+    "requirement": "CSV parser must parse full outer-piped markdown tables."
+  },
+  {
+    "id": "H23",
+    "type": "csv_parser",
+    "description": "Empty and comment-only input returns empty list safely",
+    "input": "# Empty portfolio file\n   \n# Nothing below\n",
+    "expected": [],
+    "requirement": "CSV parser must return an empty array on comment-only input without throwing."
+  },
+  {
+    "id": "H24",
+    "type": "csv_parser",
+    "description": "Interleaved valid and zero/negative invalid rows across 8 lines",
+    "input": "NEE: 0\nEQIX: -5\nXOM: 40\nTSLA: 0.0\nNVDA: 35\nINTC: -12.3\nMSFT: 25",
+    "expected": [
+      {
+        "ticker": "XOM",
+        "weight": 40.0
+      },
+      {
+        "ticker": "NVDA",
+        "weight": 35.0
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 25.0
+      }
+    ],
+    "requirement": "CSV parser must strictly retain only positive weight rows."
+  },
+  {
+    "id": "H25",
+    "type": "csv_parser",
+    "description": "Ten-stock institutional technology & infrastructure CSV roster",
+    "input": "NVDA,12\nMSFT,12\nAMZN,10\nMETA,10\nGOOGL,10\nAAPL,10\nTSLA,9\nNEE,9\nEQIX,9\nXOM,9",
+    "expected": [
+      {
+        "ticker": "NVDA",
+        "weight": 12.0
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 12.0
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 10.0
+      },
+      {
+        "ticker": "META",
+        "weight": 10.0
+      },
+      {
+        "ticker": "GOOGL",
+        "weight": 10.0
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 10.0
+      },
+      {
+        "ticker": "TSLA",
+        "weight": 9.0
+      },
+      {
+        "ticker": "NEE",
+        "weight": 9.0
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 9.0
+      },
+      {
+        "ticker": "XOM",
+        "weight": 9.0
+      }
+    ],
+    "requirement": "CSV parser must accurately ingest a 10-stock institutional roster."
+  },
+  {
+    "id": "H26",
+    "type": "portfolio_logic",
+    "description": "Mixed known and unseen tickers [PLTR 35, SNOW 35, EQIX 30] obey all hedge and sum constraints",
+    "input": [
+      {
+        "ticker": "PLTR",
+        "weight": 35
+      },
+      {
+        "ticker": "SNOW",
+        "weight": 35
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 30
+      }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": {
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 15.0
+    },
+    "requirement": "Unseen tickers mixed with known tickers must obey <= 5.0 pt stock delta, <= 15.0% turnover, and 100.0% sum."
+  },
+  {
+    "id": "H27",
+    "type": "portfolio_logic",
+    "description": "100% unseen semiconductor fab & equipment portfolio [TSM, ASML, AMAT, LRCX, KLAC]",
+    "input": [
+      {
+        "ticker": "TSM",
+        "weight": 30
+      },
+      {
+        "ticker": "ASML",
+        "weight": 25
+      },
+      {
+        "ticker": "AMAT",
+        "weight": 20
+      },
+      {
+        "ticker": "LRCX",
+        "weight": 15
+      },
+      {
+        "ticker": "KLAC",
+        "weight": 10
+      }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": {
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 15.0
+    },
+    "requirement": "Portfolio of 100% unseen semiconductor tickers must synthesize valid profiles and obey all mandate caps."
+  },
+  {
+    "id": "H28",
+    "type": "portfolio_logic",
+    "description": "100% unseen US utility & independent power producer portfolio [VST, CEG, DUK, SO, AEP]",
+    "input": [
+      {
+        "ticker": "VST",
+        "weight": 25
+      },
+      {
+        "ticker": "CEG",
+        "weight": 25
+      },
+      {
+        "ticker": "DUK",
+        "weight": 20
+      },
+      {
+        "ticker": "SO",
+        "weight": 15
+      },
+      {
+        "ticker": "AEP",
+        "weight": 15
+      }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": {
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 15.0
+    },
+    "requirement": "Unseen power & utility tickers must obey <= 5.0 pt delta, <= 15.0% turnover, and sum to 100.0%."
+  },
+  {
+    "id": "H29",
+    "type": "portfolio_logic",
+    "description": "100% unseen data center & telecom REIT portfolio [PLD, DLR, AMT, CCI, IRM]",
+    "input": [
+      {
+        "ticker": "PLD",
+        "weight": 28
+      },
+      {
+        "ticker": "DLR",
+        "weight": 24
+      },
+      {
+        "ticker": "AMT",
+        "weight": 20
+      },
+      {
+        "ticker": "CCI",
+        "weight": 16
+      },
+      {
+        "ticker": "IRM",
+        "weight": 12
+      }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": {
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 15.0
+    },
+    "requirement": "Unseen REIT tickers must obey all institutional rebalancing constraints."
+  },
+  {
+    "id": "H30",
+    "type": "portfolio_logic",
+    "description": "Unseen enterprise SaaS & cybersecurity basket [CRM, NOW, PANW, DDOG, NET, CRWD]",
+    "input": [
+      {
+        "ticker": "CRM",
+        "weight": 20
+      },
+      {
+        "ticker": "NOW",
+        "weight": 20
+      },
+      {
+        "ticker": "PANW",
+        "weight": 20
+      },
+      {
+        "ticker": "DDOG",
+        "weight": 15
+      },
+      {
+        "ticker": "NET",
+        "weight": 15
+      },
+      {
+        "ticker": "CRWD",
+        "weight": 10
+      }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": {
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 15.0
+    },
+    "requirement": "6 unseen cloud tickers must sum to 100.0% and respect delta/turnover caps."
+  },
+  {
+    "id": "H31",
+    "type": "portfolio_logic",
+    "description": "Unseen tickers with unnormalized weights [TSM 200, PLD 300, VST 500] normalize to [20, 30, 50]",
+    "input": [
+      {
+        "ticker": "TSM",
+        "weight": 200
+      },
+      {
+        "ticker": "PLD",
+        "weight": 300
+      },
+      {
+        "ticker": "VST",
+        "weight": 500
+      }
+    ],
+    "check": "normalize_weights",
+    "expected": {
+      "TSM": 20.0,
+      "PLD": 30.0,
+      "VST": 50.0
+    },
+    "requirement": "Unseen tickers with arbitrary weight scales must normalize to 100.0%."
+  },
+  {
+    "id": "H32",
+    "type": "portfolio_logic",
+    "description": "Hybrid unseen + high-risk known [NEE 35, EQIX 35, TSM 15, PLD 15] improves risk & Sharpe",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 35
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 35
+      },
+      {
+        "ticker": "TSM",
+        "weight": 15
+      },
+      {
+        "ticker": "PLD",
+        "weight": 15
+      }
+    ],
+    "check": "metrics_improvement",
+    "expected": {
+      "unpriced_improved": true,
+      "sharpe_improved": true,
+      "mdd_improved": true
+    },
+    "requirement": "Hybrid portfolio of coastal high-risk knowns and unseen tickers must improve net Unpriced Risk, Sharpe, and Max Drawdown."
+  },
+  {
+    "id": "H33",
+    "type": "portfolio_logic",
+    "description": "Hybrid unseen + fault-line knowns [NVDA 40, TSLA 30, ASML 15, DUK 15] lowers Exposure Score",
+    "input": [
+      {
+        "ticker": "NVDA",
+        "weight": 40
+      },
+      {
+        "ticker": "TSLA",
+        "weight": 30
+      },
+      {
+        "ticker": "ASML",
+        "weight": 15
+      },
+      {
+        "ticker": "DUK",
+        "weight": 15
+      }
+    ],
+    "check": "exposure_score_decreases",
+    "expected": true,
+    "requirement": "Hedged hybrid portfolio with unseen tickers must reduce overall Exposure Score (/100)."
+  },
+  {
+    "id": "H34",
+    "type": "portfolio_logic",
+    "description": "Tiny unseen ticker allocation [NEE 49, XOM 49, TSM 2] stays non-negative",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 49
+      },
+      {
+        "ticker": "XOM",
+        "weight": 49
+      },
+      {
+        "ticker": "TSM",
+        "weight": 2
+      }
+    ],
+    "check": "non_negative_and_caps",
+    "expected": {
+      "min_weight_gte": 0.0,
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 15.0
+    },
+    "requirement": "Small unseen ticker position must never be driven negative."
+  },
+  {
+    "id": "H35",
+    "type": "portfolio_logic",
+    "description": "Single-letter unseen financial/industrial tickers [C, F, V, JPM, GS]",
+    "input": [
+      {
+        "ticker": "C",
+        "weight": 20
+      },
+      {
+        "ticker": "F",
+        "weight": 20
+      },
+      {
+        "ticker": "V",
+        "weight": 20
+      },
+      {
+        "ticker": "JPM",
+        "weight": 20
+      },
+      {
+        "ticker": "GS",
+        "weight": 20
+      }
+    ],
+    "check": "hedged_sum_100",
+    "expected": 100.0,
+    "requirement": "Unseen financial & industrial tickers must sum to exactly 100.0% after hedging."
+  },
+  {
+    "id": "H36",
+    "type": "portfolio_logic",
+    "description": "Directional tilt between high-risk NEE and unseen defensive ticker CRM",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 50
+      },
+      {
+        "ticker": "CRM",
+        "weight": 50
+      }
+    ],
+    "check": "directional_tilt",
+    "expected": {
+      "decrease": "NEE",
+      "increase": "CRM"
+    },
+    "requirement": "Optimizer must shift weight away from extreme hurricane-exposed NEE (-2.1%) into lower-risk unseen CRM (-1.1%)."
+  },
+  {
+    "id": "H37",
+    "type": "portfolio_logic",
+    "description": "Directional tilt between unseen ticker VST (-1.1%) and resilient MSFT (-0.4%)",
+    "input": [
+      {
+        "ticker": "VST",
+        "weight": 50
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 50
+      }
+    ],
+    "check": "directional_tilt",
+    "expected": {
+      "decrease": "VST",
+      "increase": "MSFT"
+    },
+    "requirement": "Optimizer must shift weight from moderate-risk unseen VST (-1.1%) into ultra-resilient MSFT (-0.4%)."
+  },
+  {
+    "id": "H38",
+    "type": "portfolio_logic",
+    "description": "8-stock unseen energy & grid transition basket [VST, CEG, NRG, ETR, PEG, WEC, ES, XEL]",
+    "input": [
+      {
+        "ticker": "VST",
+        "weight": 15
+      },
+      {
+        "ticker": "CEG",
+        "weight": 15
+      },
+      {
+        "ticker": "NRG",
+        "weight": 15
+      },
+      {
+        "ticker": "ETR",
+        "weight": 15
+      },
+      {
+        "ticker": "PEG",
+        "weight": 10
+      },
+      {
+        "ticker": "WEC",
+        "weight": 10
+      },
+      {
+        "ticker": "ES",
+        "weight": 10
+      },
+      {
+        "ticker": "XEL",
+        "weight": 10
+      }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": {
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 15.0
+    },
+    "requirement": "8-stock unseen grid basket must satisfy all delta and turnover guardrails."
+  },
+  {
+    "id": "H39",
+    "type": "portfolio_logic",
+    "description": "Unseen analog & power semiconductor basket [TXN, ADI, NXPI, ON, MCHP, MPWR]",
+    "input": [
+      {
+        "ticker": "TXN",
+        "weight": 20
+      },
+      {
+        "ticker": "ADI",
+        "weight": 20
+      },
+      {
+        "ticker": "NXPI",
+        "weight": 15
+      },
+      {
+        "ticker": "ON",
+        "weight": 15
+      },
+      {
+        "ticker": "MCHP",
+        "weight": 15
+      },
+      {
+        "ticker": "MPWR",
+        "weight": 15
+      }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": {
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 15.0
+    },
+    "requirement": "6 unseen analog semiconductor tickers must satisfy all delta and turnover caps."
+  },
+  {
+    "id": "H40",
+    "type": "portfolio_logic",
+    "description": "Unseen hyperscale hardware & networking basket [ANET, DELL, SMCI, HPE, GLW, VRT]",
+    "input": [
+      {
+        "ticker": "ANET",
+        "weight": 25
+      },
+      {
+        "ticker": "VRT",
+        "weight": 25
+      },
+      {
+        "ticker": "DELL",
+        "weight": 15
+      },
+      {
+        "ticker": "SMCI",
+        "weight": 15
+      },
+      {
+        "ticker": "HPE",
+        "weight": 10
+      },
+      {
+        "ticker": "GLW",
+        "weight": 10
+      }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": {
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 15.0
+    },
+    "requirement": "Unseen AI networking & thermal cooling basket must obey mandate guardrails."
+  },
+  {
+    "id": "H41",
+    "type": "portfolio_logic",
+    "description": "Mixed known + unseen AI infrastructure [NVDA 25, VRT 25, ANET 20, EQIX 15, MSFT 15]",
+    "input": [
+      {
+        "ticker": "NVDA",
+        "weight": 25
+      },
+      {
+        "ticker": "VRT",
+        "weight": 25
+      },
+      {
+        "ticker": "ANET",
+        "weight": 20
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 15
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 15
+      }
+    ],
+    "check": "metrics_improvement",
+    "expected": {
+      "unpriced_improved": true,
+      "sharpe_improved": true,
+      "mdd_improved": true
+    },
+    "requirement": "Mixed AI hardware & cooling basket must improve net Unpriced Risk, Sharpe, and Max Drawdown."
+  },
+  {
+    "id": "H42",
+    "type": "portfolio_logic",
+    "description": "Unseen ticker with lowercase/whitespace input [' tsm ', ' pld ', ' msft '] normalizes cleanly",
+    "input": [
+      {
+        "ticker": " tsm ",
+        "weight": 40
+      },
+      {
+        "ticker": " pld ",
+        "weight": 30
+      },
+      {
+        "ticker": " msft ",
+        "weight": 30
+      }
+    ],
+    "check": "normalize_weights",
+    "expected": {
+      "TSM": 40.0,
+      "PLD": 30.0,
+      "MSFT": 30.0
+    },
+    "requirement": "buildPortfolioProfiles must trim and uppercase unseen ticker symbols."
+  },
+  {
+    "id": "H43",
+    "type": "portfolio_logic",
+    "description": "Duplicate unseen tickers passed directly to buildPortfolioProfiles are aggregated",
+    "input": [
+      {
+        "ticker": "TSM",
+        "weight": 20
+      },
+      {
+        "ticker": "TSM",
+        "weight": 30
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 50
+      }
+    ],
+    "check": "normalize_weights",
+    "expected": {
+      "TSM": 50.0,
+      "MSFT": 50.0
+    },
+    "requirement": "buildPortfolioProfiles must aggregate duplicate unseen ticker entries before normalizing."
+  },
+  {
+    "id": "H44",
+    "type": "portfolio_logic",
+    "description": "10-stock 50/50 split of 5 knowns and 5 unseen tickers",
+    "input": [
+      {
+        "ticker": "NVDA",
+        "weight": 10
+      },
+      {
+        "ticker": "NEE",
+        "weight": 10
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 10
+      },
+      {
+        "ticker": "XOM",
+        "weight": 10
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 10
+      },
+      {
+        "ticker": "TSM",
+        "weight": 10
+      },
+      {
+        "ticker": "ASML",
+        "weight": 10
+      },
+      {
+        "ticker": "PLD",
+        "weight": 10
+      },
+      {
+        "ticker": "VST",
+        "weight": 10
+      },
+      {
+        "ticker": "CEG",
+        "weight": 10
+      }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": {
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 15.0
+    },
+    "requirement": "10-stock blended known/unseen portfolio must satisfy all delta, turnover, and sum constraints."
+  },
+  {
+    "id": "H45",
+    "type": "portfolio_logic",
+    "description": "Blended known/unseen 10-stock portfolio improves net risk & Sharpe",
+    "input": [
+      {
+        "ticker": "NVDA",
+        "weight": 14
+      },
+      {
+        "ticker": "NEE",
+        "weight": 14
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 14
+      },
+      {
+        "ticker": "XOM",
+        "weight": 12
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 6
+      },
+      {
+        "ticker": "TSM",
+        "weight": 8
+      },
+      {
+        "ticker": "ASML",
+        "weight": 8
+      },
+      {
+        "ticker": "PLD",
+        "weight": 8
+      },
+      {
+        "ticker": "VST",
+        "weight": 8
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 8
+      }
+    ],
+    "check": "metrics_improvement",
+    "expected": {
+      "unpriced_improved": true,
+      "sharpe_improved": true,
+      "mdd_improved": true
+    },
+    "requirement": "Top-heavy blended known/unseen portfolio must improve net Unpriced Risk, Sharpe, and Max Drawdown."
+  },
+  {
+    "id": "H46",
+    "type": "portfolio_logic",
+    "description": "Unseen ticker at 96% and high-risk NEE at 4% clamps shift at 4.0%",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 4.0
+      },
+      {
+        "ticker": "TSM",
+        "weight": 96.0
+      }
+    ],
+    "check": "exact_hedged_weights",
+    "expected": {
+      "NEE": 0.0,
+      "TSM": 100.0
+    },
+    "requirement": "When NEE is 4% and unseen TSM is 96%, NEE is clamped at 0% and TSM at 100%."
+  },
+  {
+    "id": "H47",
+    "type": "portfolio_logic",
+    "description": "Unseen ticker at 3% and resilient MSFT at 97% clamps shift at 3.0%",
+    "input": [
+      {
+        "ticker": "TSM",
+        "weight": 3.0
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 97.0
+      }
+    ],
+    "check": "exact_hedged_weights",
+    "expected": {
+      "TSM": 0.0,
+      "MSFT": 100.0
+    },
+    "requirement": "When unseen TSM (-1.1%) is 3% and MSFT (-0.4%) is 97%, shift is bounded by 3.0%."
+  },
+  {
+    "id": "H48",
+    "type": "portfolio_logic",
+    "description": "Sorting order verification with unseen ticker TSM (-0.6% fallback drag) placed strictly between GOOGL (-0.8%) and ORCL (-0.5%)",
+    "input": [
+      {
+        "ticker": "MSFT",
+        "weight": 20
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 20
+      },
+      {
+        "ticker": "TSM",
+        "weight": 20
+      },
+      {
+        "ticker": "GOOGL",
+        "weight": 20
+      },
+      {
+        "ticker": "NVDA",
+        "weight": 20
+      }
+    ],
+    "check": "sorted_order",
+    "expected": [
+      "NVDA",
+      "GOOGL",
+      "TSM",
+      "ORCL",
+      "MSFT"
+    ],
+    "requirement": "Unseen ticker with -0.6% fallback drag must sort strictly between GOOGL (-0.8%) and ORCL (-0.5%)."
+  },
+  {
+    "id": "H49",
+    "type": "portfolio_logic",
+    "description": "Exact turnover and tx cost on 2-stock unseen vs known pair [TSM 50, MSFT 50]",
+    "input": [
+      {
+        "ticker": "TSM",
+        "weight": 50
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 50
+      }
+    ],
+    "check": "exact_turnover_tx",
+    "expected": {
+      "turnoverPct": 5.0,
+      "transactionCostPct": 0.01
+    },
+    "requirement": "2-stock [TSM 50, MSFT 50] shifts 5.0% from TSM to MSFT -> 5.0% turnover and 0.01% tx cost."
+  },
+  {
+    "id": "H50",
+    "type": "portfolio_logic",
+    "description": "15-stock institutional pension roster (8 known + 7 unseen) obeys all guardrails",
+    "input": [
+      {
+        "ticker": "NVDA",
+        "weight": 8
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 8
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 7
+      },
+      {
+        "ticker": "GOOGL",
+        "weight": 7
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 7
+      },
+      {
+        "ticker": "META",
+        "weight": 7
+      },
+      {
+        "ticker": "NEE",
+        "weight": 6
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 6
+      },
+      {
+        "ticker": "TSM",
+        "weight": 7
+      },
+      {
+        "ticker": "ASML",
+        "weight": 7
+      },
+      {
+        "ticker": "PLD",
+        "weight": 6
+      },
+      {
+        "ticker": "DLR",
+        "weight": 6
+      },
+      {
+        "ticker": "VST",
+        "weight": 6
+      },
+      {
+        "ticker": "CEG",
+        "weight": 6
+      },
+      {
+        "ticker": "DUK",
+        "weight": 6
+      }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": {
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 15.0
+    },
+    "requirement": "15-stock institutional pension roster must satisfy all mandate caps."
+  },
+  {
+    "id": "H51",
+    "type": "portfolio_logic",
+    "description": "Unnormalized basis-point style weights [250, 250, 500] normalize to [25.0, 25.0, 50.0]",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 250
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 250
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 500
+      }
+    ],
+    "check": "normalize_weights",
+    "expected": {
+      "NEE": 25.0,
+      "EQIX": 25.0,
+      "MSFT": 50.0
+    },
+    "requirement": "buildPortfolioProfiles must normalize arbitrary positive weight scales to 100.0%."
+  },
+  {
+    "id": "H52",
+    "type": "portfolio_logic",
+    "description": "Strict sorting on 7-stock portfolio across all hazard tiers",
+    "input": [
+      {
+        "ticker": "MSFT",
+        "weight": 15
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 15
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 15
+      },
+      {
+        "ticker": "AMD",
+        "weight": 15
+      },
+      {
+        "ticker": "NVDA",
+        "weight": 15
+      },
+      {
+        "ticker": "XOM",
+        "weight": 15
+      },
+      {
+        "ticker": "NEE",
+        "weight": 10
+      }
+    ],
+    "check": "sorted_order",
+    "expected": [
+      "NEE",
+      "XOM",
+      "NVDA",
+      "AMD",
+      "AAPL",
+      "ORCL",
+      "MSFT"
+    ],
+    "requirement": "Holdings must be strictly ordered from most negative unpricedRiskPct (-2.1%) to least (-0.4%)."
+  },
+  {
+    "id": "H53",
+    "type": "portfolio_logic",
+    "description": "Asymmetric 4-to-1 portfolio: 4 high-risk stocks (20% each) and 1 low-risk stock (MSFT 20%) limited by MSFT's +5.0 pt cap -> total turnover = 5.0%",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 20
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 20
+      },
+      {
+        "ticker": "XOM",
+        "weight": 20
+      },
+      {
+        "ticker": "TSLA",
+        "weight": 20
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 20
+      }
+    ],
+    "check": "exact_turnover_tx",
+    "expected": {
+      "turnoverPct": 5.0,
+      "transactionCostPct": 0.01
+    },
+    "requirement": "When only 1 low-risk stock is available to absorb reallocated weight, its +5.0 pt cap limits total portfolio one-way turnover to 5.0%."
+  },
+  {
+    "id": "H54",
+    "type": "portfolio_logic",
+    "description": "Asymmetric 1-to-4 portfolio: 1 high-risk stock (NEE 40%) and 4 low-risk stocks (15% each) limited by NEE's -5.0 pt cap -> NEE hedgedWeight = 35.0%",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 40
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 15
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 15
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 15
+      },
+      {
+        "ticker": "AMD",
+        "weight": 15
+      }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": {
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 5.0
+    },
+    "requirement": "When only 1 high-risk stock is trimmed, its -5.0 pt cap limits total one-way turnover to 5.0%."
+  },
+  {
+    "id": "H55",
+    "type": "portfolio_logic",
+    "description": "12-stock broad portfolio obeys both <= 5.0 pt stock delta and <= 15.0% turnover cap",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 9
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 9
+      },
+      {
+        "ticker": "XOM",
+        "weight": 9
+      },
+      {
+        "ticker": "TSLA",
+        "weight": 9
+      },
+      {
+        "ticker": "NVDA",
+        "weight": 9
+      },
+      {
+        "ticker": "INTC",
+        "weight": 9
+      },
+      {
+        "ticker": "META",
+        "weight": 8
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 8
+      },
+      {
+        "ticker": "GOOGL",
+        "weight": 8
+      },
+      {
+        "ticker": "AMD",
+        "weight": 8
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 7
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 7
+      }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": {
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 15.0
+    },
+    "requirement": "12-stock portfolio must strictly satisfy |delta_i| <= 5.0 and turnover <= 15.0%."
+  },
+  {
+    "id": "H56",
+    "type": "portfolio_logic",
+    "description": "Tiny high-risk weight (NEE 1.5%, XOM 48.5%, MSFT 50.0%) clamps NEE reduction at 1.5% (hedgedWeight = 0.0%)",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 1.5
+      },
+      {
+        "ticker": "XOM",
+        "weight": 48.5
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 50.0
+      }
+    ],
+    "check": "non_negative_and_caps",
+    "expected": {
+      "min_weight_gte": 0.0,
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 15.0
+    },
+    "requirement": "A high-risk stock with initial weight < 5.0% must be clamped at 0.0% without going negative."
+  },
+  {
+    "id": "H57",
+    "type": "portfolio_logic",
+    "description": "Dominant low-risk stock (NEE 3%, MSFT 97%) clamps MSFT increase at +3.0% so MSFT <= 100.0%",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 3.0
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 97.0
+      }
+    ],
+    "check": "exact_hedged_weights",
+    "expected": {
+      "NEE": 0.0,
+      "MSFT": 100.0
+    },
+    "requirement": "When weight is 97.0% and 3.0%, hedging shifts at most 3.0% so weights stay within [0, 100]."
+  },
+  {
+    "id": "H58",
+    "type": "portfolio_logic",
+    "description": "Full 14-stock curated universe equal-weighted obeys all guardrails",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 10
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 10
+      },
+      {
+        "ticker": "XOM",
+        "weight": 10
+      },
+      {
+        "ticker": "TSLA",
+        "weight": 10
+      },
+      {
+        "ticker": "NVDA",
+        "weight": 10
+      },
+      {
+        "ticker": "AVGO",
+        "weight": 10
+      },
+      {
+        "ticker": "INTC",
+        "weight": 10
+      },
+      {
+        "ticker": "META",
+        "weight": 10
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 10
+      },
+      {
+        "ticker": "GOOGL",
+        "weight": 10
+      },
+      {
+        "ticker": "AMD",
+        "weight": 10
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 10
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 10
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 10
+      }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": {
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 15.0
+    },
+    "requirement": "All 14 curated equities together must satisfy <= 5.0 pt stock delta, <= 15.0% turnover, and 100.0% sum."
+  },
+  {
+    "id": "H59",
+    "type": "portfolio_logic",
+    "description": "Asymmetric 5-to-2 portfolio (5 high-risk at 16% each, 2 low-risk ORCL/MSFT at 10% each) capped at 10.0% turnover",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 16
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 16
+      },
+      {
+        "ticker": "XOM",
+        "weight": 16
+      },
+      {
+        "ticker": "TSLA",
+        "weight": 16
+      },
+      {
+        "ticker": "NVDA",
+        "weight": 16
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 10
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 10
+      }
+    ],
+    "check": "exact_turnover_tx",
+    "expected": {
+      "turnoverPct": 10.0,
+      "transactionCostPct": 0.02
+    },
+    "requirement": "2 low-risk stocks can absorb at most +5.0 pts each -> total turnover = 10.0% and tx cost = 0.02%."
+  },
+  {
+    "id": "H60",
+    "type": "portfolio_logic",
+    "description": "Asymmetric 2-to-5 portfolio (2 high-risk NEE/EQIX at 25% each, 5 low-risk at 10% each) capped at 10.0% turnover",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 25
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 25
+      },
+      {
+        "ticker": "GOOGL",
+        "weight": 10
+      },
+      {
+        "ticker": "AMD",
+        "weight": 10
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 10
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 10
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 10
+      }
+    ],
+    "check": "exact_turnover_tx",
+    "expected": {
+      "turnoverPct": 10.0,
+      "transactionCostPct": 0.02
+    },
+    "requirement": "2 high-risk stocks can shed at most -5.0 pts each -> total turnover = 10.0% and tx cost = 0.02%."
+  },
+  {
+    "id": "H61",
+    "type": "portfolio_logic",
+    "description": "3-to-3 balanced high/low risk portfolio hits exact 15.0% max turnover cap",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 20
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 20
+      },
+      {
+        "ticker": "XOM",
+        "weight": 20
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 14
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 13
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 13
+      }
+    ],
+    "check": "exact_turnover_tx",
+    "expected": {
+      "turnoverPct": 15.0,
+      "transactionCostPct": 0.03
+    },
+    "requirement": "3 high-risk stocks (-5 pts each) and 3 low-risk stocks (+5 pts each) achieve exact 15.0% turnover and 0.03% tx cost."
+  },
+  {
+    "id": "H62",
+    "type": "portfolio_logic",
+    "description": "4-to-4 portfolio is bounded by the global 15.0% turnover cap even though sum of individual caps is 20.0%",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 15
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 15
+      },
+      {
+        "ticker": "XOM",
+        "weight": 15
+      },
+      {
+        "ticker": "TSLA",
+        "weight": 15
+      },
+      {
+        "ticker": "AMD",
+        "weight": 10
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 10
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 10
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 10
+      }
+    ],
+    "check": "exact_turnover_tx",
+    "expected": {
+      "turnoverPct": 15.0,
+      "transactionCostPct": 0.03
+    },
+    "requirement": "Global 15.0% turnover cap must bind when sum of individual 5.0 pt stock caps (20.0%) exceeds 15.0%."
+  },
+  {
+    "id": "H63",
+    "type": "portfolio_logic",
+    "description": "Equal severity portfolio [TSM 50, AAPL 50] (both -0.6% drag) results in zero turnover",
+    "input": [
+      {
+        "ticker": "TSM",
+        "weight": 50
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 50
+      }
+    ],
+    "check": "exact_hedged_weights",
+    "expected": {
+      "TSM": 50.0,
+      "AAPL": 50.0
+    },
+    "requirement": "When all holdings have identical unpricedRiskPct (-0.6%), no weight is shifted."
+  },
+  {
+    "id": "H64",
+    "type": "portfolio_logic",
+    "description": "2-stock portfolio with -1.0% (GOOGL) and -0.9% (AMD) shifts 5.0% toward lower-risk AMD",
+    "input": [
+      {
+        "ticker": "GOOGL",
+        "weight": 50
+      },
+      {
+        "ticker": "AMD",
+        "weight": 50
+      }
+    ],
+    "check": "exact_turnover_tx",
+    "expected": {
+      "turnoverPct": 5.0,
+      "transactionCostPct": 0.01
+    },
+    "requirement": "2-stock portfolio with -1.0% (GOOGL) and -0.9% (AMD) shifts 5.0% toward lower-risk AMD."
+  },
+  {
+    "id": "H65",
+    "type": "portfolio_logic",
+    "description": "Micro-position high-risk stocks [NEE 0.8%, EQIX 1.2%, XOM 2.0%, MSFT 96.0%] clamp at 0.0%",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 0.8
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 1.2
+      },
+      {
+        "ticker": "XOM",
+        "weight": 2.0
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 96.0
+      }
+    ],
+    "check": "exact_hedged_weights",
+    "expected": {
+      "NEE": 0.0,
+      "EQIX": 0.0,
+      "XOM": 0.0,
+      "MSFT": 100.0
+    },
+    "requirement": "Three micro-positions totaling 4.0% are fully liquidated to 0.0% while MSFT increases by +4.0% to 100.0%."
+  },
+  {
+    "id": "H66",
+    "type": "portfolio_logic",
+    "description": "Micro-position low-risk stock [NEE 98.5%, MSFT 1.5%] increases MSFT by +5.0% to 6.5%",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 98.5
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 1.5
+      }
+    ],
+    "check": "exact_hedged_weights",
+    "expected": {
+      "NEE": 93.5,
+      "MSFT": 6.5
+    },
+    "requirement": "Low-risk stock at 1.5% can grow by +5.0 pts to 6.5% while NEE drops from 98.5% to 93.5%."
+  },
+  {
+    "id": "H67",
+    "type": "portfolio_logic",
+    "description": "Dollar-denominated institutional portfolio [$400k NVDA, $300k META, $200k AAPL, $100k MSFT] normalizes to [40, 30, 20, 10]",
+    "input": [
+      {
+        "ticker": "NVDA",
+        "weight": 400000
+      },
+      {
+        "ticker": "META",
+        "weight": 300000
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 200000
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 100000
+      }
+    ],
+    "check": "normalize_weights",
+    "expected": {
+      "NVDA": 40.0,
+      "META": 30.0,
+      "AAPL": 20.0,
+      "MSFT": 10.0
+    },
+    "requirement": "Dollar-value inputs must normalize accurately to percentages summing to 100.0%."
+  },
+  {
+    "id": "H68",
+    "type": "portfolio_logic",
+    "description": "Fractional decimal input weights [0.25, 0.25, 0.50] normalize to [25.0, 25.0, 50.0]",
+    "input": [
+      {
+        "ticker": "EQIX",
+        "weight": 0.25
+      },
+      {
+        "ticker": "INTC",
+        "weight": 0.25
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 0.5
+      }
+    ],
+    "check": "normalize_weights",
+    "expected": {
+      "EQIX": 25.0,
+      "INTC": 25.0,
+      "ORCL": 50.0
+    },
+    "requirement": "Decimal ratio weights summing to 1.0 must normalize to 100.0%."
+  },
+  {
+    "id": "H69",
+    "type": "portfolio_logic",
+    "description": "Waterfilling priority check: when NEE (2.1%) and META (1.2%) are trimmed against MSFT (0.4%), NEE decreases and MSFT increases",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 35
+      },
+      {
+        "ticker": "META",
+        "weight": 35
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 30
+      }
+    ],
+    "check": "directional_tilt",
+    "expected": {
+      "decrease": "NEE",
+      "increase": "MSFT"
+    },
+    "requirement": "Waterfilling must trim NEE and add to MSFT."
+  },
+  {
+    "id": "H70",
+    "type": "portfolio_logic",
+    "description": "Strict sorting on 6 West Coast & Semiconductor stocks",
+    "input": [
+      {
+        "ticker": "AAPL",
+        "weight": 15
+      },
+      {
+        "ticker": "AMD",
+        "weight": 15
+      },
+      {
+        "ticker": "GOOGL",
+        "weight": 15
+      },
+      {
+        "ticker": "META",
+        "weight": 15
+      },
+      {
+        "ticker": "INTC",
+        "weight": 20
+      },
+      {
+        "ticker": "TSLA",
+        "weight": 20
+      }
+    ],
+    "check": "sorted_order",
+    "expected": [
+      "TSLA",
+      "INTC",
+      "META",
+      "GOOGL",
+      "AMD",
+      "AAPL"
+    ],
+    "requirement": "West Coast tech & fab stocks must sort by unpricedRiskPct: TSLA (-1.5), INTC (-1.3), META (-1.2), GOOGL (-1.0), AMD (-0.9), AAPL (-0.8)."
+  },
+  {
+    "id": "H71",
+    "type": "portfolio_logic",
+    "description": "Strict sorting on 5 Energy, REIT, Cloud & Enterprise stocks",
+    "input": [
+      {
+        "ticker": "MSFT",
+        "weight": 20
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 20
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 20
+      },
+      {
+        "ticker": "XOM",
+        "weight": 20
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 20
+      }
+    ],
+    "check": "sorted_order",
+    "expected": [
+      "EQIX",
+      "XOM",
+      "AMZN",
+      "ORCL",
+      "MSFT"
+    ],
+    "requirement": "Holdings must sort: EQIX (-1.9), XOM (-1.7), AMZN (-1.1), ORCL (-0.6), MSFT (-0.4)."
+  },
+  {
+    "id": "H72",
+    "type": "portfolio_logic",
+    "description": "9-stock portfolio with uneven odd weights sums to 100.0% after hedging",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 11.1
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 11.1
+      },
+      {
+        "ticker": "XOM",
+        "weight": 11.1
+      },
+      {
+        "ticker": "TSLA",
+        "weight": 11.1
+      },
+      {
+        "ticker": "NVDA",
+        "weight": 11.1
+      },
+      {
+        "ticker": "INTC",
+        "weight": 11.1
+      },
+      {
+        "ticker": "META",
+        "weight": 11.1
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 11.1
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 11.2
+      }
+    ],
+    "check": "hedged_sum_100",
+    "expected": 100.0,
+    "requirement": "Repeating-decimal portfolio weights must sum to 100.0% after hedging without rounding drift."
+  },
+  {
+    "id": "H73",
+    "type": "portfolio_logic",
+    "description": "7-stock equal-weight (100/7 each) normalizes and hedges to exactly 100.0%",
+    "input": [
+      {
+        "ticker": "NVDA",
+        "weight": 1
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 1
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 1
+      },
+      {
+        "ticker": "META",
+        "weight": 1
+      },
+      {
+        "ticker": "GOOGL",
+        "weight": 1
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 1
+      },
+      {
+        "ticker": "TSLA",
+        "weight": 1
+      }
+    ],
+    "check": "hedged_sum_100",
+    "expected": 100.0,
+    "requirement": "7-stock equal-weight portfolio (1/7 each) must sum to 100.0% without 0.1% rounding error."
+  },
+  {
+    "id": "H74",
+    "type": "portfolio_logic",
+    "description": "11-stock equal-weight (1/11 each) normalizes and hedges to 100.0% within caps",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 1
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 1
+      },
+      {
+        "ticker": "XOM",
+        "weight": 1
+      },
+      {
+        "ticker": "TSLA",
+        "weight": 1
+      },
+      {
+        "ticker": "NVDA",
+        "weight": 1
+      },
+      {
+        "ticker": "AVGO",
+        "weight": 1
+      },
+      {
+        "ticker": "INTC",
+        "weight": 1
+      },
+      {
+        "ticker": "META",
+        "weight": 1
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 1
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 1
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 1
+      }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": {
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 15.0
+    },
+    "requirement": "11-stock equal-weight portfolio must normalize and hedge cleanly to 100.0%."
+  },
+  {
+    "id": "H75",
+    "type": "portfolio_logic",
+    "description": "13-stock equal-weight (1/13 each) normalizes and hedges to 100.0% within caps",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 1
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 1
+      },
+      {
+        "ticker": "XOM",
+        "weight": 1
+      },
+      {
+        "ticker": "TSLA",
+        "weight": 1
+      },
+      {
+        "ticker": "NVDA",
+        "weight": 1
+      },
+      {
+        "ticker": "AVGO",
+        "weight": 1
+      },
+      {
+        "ticker": "INTC",
+        "weight": 1
+      },
+      {
+        "ticker": "META",
+        "weight": 1
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 1
+      },
+      {
+        "ticker": "GOOGL",
+        "weight": 1
+      },
+      {
+        "ticker": "AMD",
+        "weight": 1
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 1
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 1
+      }
+    ],
+    "check": "max_delta_and_turnover",
+    "expected": {
+      "max_abs_delta_lte": 5.0,
+      "turnover_lte": 15.0
+    },
+    "requirement": "13-stock equal-weight portfolio must normalize and hedge cleanly to 100.0%."
+  },
+  {
+    "id": "H76",
+    "type": "portfolio_logic",
+    "description": "Coastal Grid & Data REITs preset improves net Unpriced Risk, Sharpe, and Max Drawdown after tx costs",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 28
+      },
+      {
+        "ticker": "EQIX",
+        "weight": 24
+      },
+      {
+        "ticker": "XOM",
+        "weight": 22
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 14
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 12
+      }
+    ],
+    "check": "metrics_improvement",
+    "expected": {
+      "unpriced_improved": true,
+      "sharpe_improved": true,
+      "mdd_improved": true
+    },
+    "requirement": "Hedged Coastal Grid & Data REITs portfolio must improve net Unpriced Risk, Sharpe, and Max Drawdown."
+  },
+  {
+    "id": "H77",
     "type": "portfolio_logic",
     "description": "Fault-Line Hardware & Fabs preset lowers Exposure Score (/100) when hedged",
     "input": [
-      { "ticker": "NVDA", "weight": 28 },
-      { "ticker": "TSLA", "weight": 22 },
-      { "ticker": "INTC", "weight": 20 },
-      { "ticker": "AAPL", "weight": 18 },
-      { "ticker": "AMD", "weight": 12 }
+      {
+        "ticker": "NVDA",
+        "weight": 28
+      },
+      {
+        "ticker": "TSLA",
+        "weight": 22
+      },
+      {
+        "ticker": "INTC",
+        "weight": 20
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 18
+      },
+      {
+        "ticker": "AMD",
+        "weight": 12
+      }
     ],
     "check": "exposure_score_decreases",
     "expected": true,
     "requirement": "Risk-hedged weights on Fault-Line Hardware & Fabs must lower the portfolio Exposure Score (/100)."
   },
   {
-    "id": "H15",
+    "id": "H78",
     "type": "portfolio_logic",
-    "description": "Mixed known and unseen tickers [PLTR 35, SNOW 35, EQIX 30] obey all hedge and sum constraints",
+    "description": "AI & Cloud Leaders preset lowers Exposure Score (/100) when hedged",
     "input": [
-      { "ticker": "PLTR", "weight": 35 },
-      { "ticker": "SNOW", "weight": 35 },
-      { "ticker": "EQIX", "weight": 30 }
+      {
+        "ticker": "NVDA",
+        "weight": 28
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 22
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 18
+      },
+      {
+        "ticker": "META",
+        "weight": 16
+      },
+      {
+        "ticker": "GOOGL",
+        "weight": 16
+      }
     ],
-    "check": "max_delta_and_turnover",
-    "expected": { "max_abs_delta_lte": 5.0, "turnover_lte": 15.0 },
-    "requirement": "Unseen tickers mixed with known tickers must obey <= 5.0 pt stock delta, <= 15.0% turnover, and 100.0% sum."
+    "check": "exposure_score_decreases",
+    "expected": true,
+    "requirement": "Risk-hedged weights on AI & Cloud Leaders must lower the portfolio Exposure Score (/100)."
+  },
+  {
+    "id": "H79",
+    "type": "portfolio_logic",
+    "description": "Gulf Hurricane Energy & Utility heavy basket [NEE 35, XOM 35, ORCL 15, MSFT 15] improves all risk-adjusted metrics",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 35
+      },
+      {
+        "ticker": "XOM",
+        "weight": 35
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 15
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 15
+      }
+    ],
+    "check": "metrics_improvement",
+    "expected": {
+      "unpriced_improved": true,
+      "sharpe_improved": true,
+      "mdd_improved": true
+    },
+    "requirement": "Hedged Gulf Hurricane basket must improve Unpriced Risk, Sharpe, and Max Drawdown."
+  },
+  {
+    "id": "H80",
+    "type": "portfolio_logic",
+    "description": "Silicon Valley Seismic Cluster [NVDA 30, AVGO 30, INTC 20, AAPL 10, MSFT 10] improves all risk-adjusted metrics",
+    "input": [
+      {
+        "ticker": "NVDA",
+        "weight": 30
+      },
+      {
+        "ticker": "AVGO",
+        "weight": 30
+      },
+      {
+        "ticker": "INTC",
+        "weight": 20
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 10
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 10
+      }
+    ],
+    "check": "metrics_improvement",
+    "expected": {
+      "unpriced_improved": true,
+      "sharpe_improved": true,
+      "mdd_improved": true
+    },
+    "requirement": "Hedged Silicon Valley Seismic Cluster must improve Unpriced Risk, Sharpe, and Max Drawdown."
+  },
+  {
+    "id": "H81",
+    "type": "portfolio_logic",
+    "description": "Hyperscale Data Center & Colocation basket [EQIX 40, META 30, AMZN 15, ORCL 15] lowers Exposure Score",
+    "input": [
+      {
+        "ticker": "EQIX",
+        "weight": 40
+      },
+      {
+        "ticker": "META",
+        "weight": 30
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 15
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 15
+      }
+    ],
+    "check": "exposure_score_decreases",
+    "expected": true,
+    "requirement": "Hedged Hyperscale Data Center basket must reduce Exposure Score."
+  },
+  {
+    "id": "H82",
+    "type": "portfolio_logic",
+    "description": "Magnificent-7 Equal-Weight basket [NVDA, TSLA, META, AMZN, GOOGL, AAPL, MSFT] improves net risk & Sharpe",
+    "input": [
+      {
+        "ticker": "NVDA",
+        "weight": 15
+      },
+      {
+        "ticker": "TSLA",
+        "weight": 15
+      },
+      {
+        "ticker": "META",
+        "weight": 14
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 14
+      },
+      {
+        "ticker": "GOOGL",
+        "weight": 14
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 14
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 14
+      }
+    ],
+    "check": "metrics_improvement",
+    "expected": {
+      "unpriced_improved": true,
+      "sharpe_improved": true,
+      "mdd_improved": true
+    },
+    "requirement": "Magnificent-7 portfolio must improve Unpriced Risk, Net Sharpe, and Max Drawdown when hedged."
+  },
+  {
+    "id": "H83",
+    "type": "portfolio_logic",
+    "description": "Magnificent-7 Market-Cap Skewed basket lowers Exposure Score",
+    "input": [
+      {
+        "ticker": "AAPL",
+        "weight": 20
+      },
+      {
+        "ticker": "NVDA",
+        "weight": 20
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 20
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 12
+      },
+      {
+        "ticker": "META",
+        "weight": 10
+      },
+      {
+        "ticker": "GOOGL",
+        "weight": 10
+      },
+      {
+        "ticker": "TSLA",
+        "weight": 8
+      }
+    ],
+    "check": "exposure_score_decreases",
+    "expected": true,
+    "requirement": "Market-cap skewed Mag-7 basket must lower Exposure Score when hedged."
+  },
+  {
+    "id": "H84",
+    "type": "portfolio_logic",
+    "description": "Semiconductor Value Chain [NVDA 25, AVGO 25, INTC 20, AMD 15, AAPL 15] improves net risk & Sharpe",
+    "input": [
+      {
+        "ticker": "NVDA",
+        "weight": 25
+      },
+      {
+        "ticker": "AVGO",
+        "weight": 25
+      },
+      {
+        "ticker": "INTC",
+        "weight": 20
+      },
+      {
+        "ticker": "AMD",
+        "weight": 15
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 15
+      }
+    ],
+    "check": "metrics_improvement",
+    "expected": {
+      "unpriced_improved": true,
+      "sharpe_improved": true,
+      "mdd_improved": true
+    },
+    "requirement": "Semiconductor Value Chain portfolio must improve Unpriced Risk, Sharpe, and Max Drawdown."
+  },
+  {
+    "id": "H85",
+    "type": "portfolio_logic",
+    "description": "ERCOT Texas Power & Compute Concentration [XOM 30, TSLA 30, NVDA 20, ORCL 10, MSFT 10] improves all risk metrics",
+    "input": [
+      {
+        "ticker": "XOM",
+        "weight": 30
+      },
+      {
+        "ticker": "TSLA",
+        "weight": 30
+      },
+      {
+        "ticker": "NVDA",
+        "weight": 20
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 10
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 10
+      }
+    ],
+    "check": "metrics_improvement",
+    "expected": {
+      "unpriced_improved": true,
+      "sharpe_improved": true,
+      "mdd_improved": true
+    },
+    "requirement": "ERCOT Texas concentration basket must improve Unpriced Risk, Sharpe, and Max Drawdown."
+  },
+  {
+    "id": "H86",
+    "type": "portfolio_logic",
+    "description": "PJM Northern Virginia Data Center Alley [EQIX 35, AMZN 25, META 20, GOOGL 10, MSFT 10] improves all risk metrics",
+    "input": [
+      {
+        "ticker": "EQIX",
+        "weight": 35
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 25
+      },
+      {
+        "ticker": "META",
+        "weight": 20
+      },
+      {
+        "ticker": "GOOGL",
+        "weight": 10
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 10
+      }
+    ],
+    "check": "metrics_improvement",
+    "expected": {
+      "unpriced_improved": true,
+      "sharpe_improved": true,
+      "mdd_improved": true
+    },
+    "requirement": "PJM Data Center Alley portfolio must improve Unpriced Risk, Sharpe, and Max Drawdown."
+  },
+  {
+    "id": "H87",
+    "type": "portfolio_logic",
+    "description": "Directional tilt: EQIX (-1.9%) decreases and ORCL (-0.6%) increases in a 2-stock pair",
+    "input": [
+      {
+        "ticker": "EQIX",
+        "weight": 50
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 50
+      }
+    ],
+    "check": "directional_tilt",
+    "expected": {
+      "decrease": "EQIX",
+      "increase": "ORCL"
+    },
+    "requirement": "Optimizer must trim EQIX and increase ORCL."
+  },
+  {
+    "id": "H88",
+    "type": "portfolio_logic",
+    "description": "Directional tilt: XOM (-1.7%) decreases and AAPL (-0.8%) increases in a 2-stock pair",
+    "input": [
+      {
+        "ticker": "XOM",
+        "weight": 50
+      },
+      {
+        "ticker": "AAPL",
+        "weight": 50
+      }
+    ],
+    "check": "directional_tilt",
+    "expected": {
+      "decrease": "XOM",
+      "increase": "AAPL"
+    },
+    "requirement": "Optimizer must trim XOM and increase AAPL."
+  },
+  {
+    "id": "H89",
+    "type": "portfolio_logic",
+    "description": "Directional tilt: TSLA (-1.5%) decreases and AMD (-0.9%) increases in a 2-stock pair",
+    "input": [
+      {
+        "ticker": "TSLA",
+        "weight": 50
+      },
+      {
+        "ticker": "AMD",
+        "weight": 50
+      }
+    ],
+    "check": "directional_tilt",
+    "expected": {
+      "decrease": "TSLA",
+      "increase": "AMD"
+    },
+    "requirement": "Optimizer must trim TSLA and increase AMD."
+  },
+  {
+    "id": "H90",
+    "type": "portfolio_logic",
+    "description": "Directional tilt: INTC (-1.3%) decreases and GOOGL (-1.0%) increases in a 2-stock pair",
+    "input": [
+      {
+        "ticker": "INTC",
+        "weight": 50
+      },
+      {
+        "ticker": "GOOGL",
+        "weight": 50
+      }
+    ],
+    "check": "directional_tilt",
+    "expected": {
+      "decrease": "INTC",
+      "increase": "GOOGL"
+    },
+    "requirement": "Optimizer must trim INTC and increase GOOGL."
+  },
+  {
+    "id": "H91",
+    "type": "portfolio_logic",
+    "description": "Directional tilt: NVDA (-1.8%) decreases and AMZN (-1.0%) increases in a 2-stock pair",
+    "input": [
+      {
+        "ticker": "NVDA",
+        "weight": 50
+      },
+      {
+        "ticker": "AMZN",
+        "weight": 50
+      }
+    ],
+    "check": "directional_tilt",
+    "expected": {
+      "decrease": "NVDA",
+      "increase": "AMZN"
+    },
+    "requirement": "Optimizer must trim NVDA (-1.8%) and increase AMZN (-1.0%)."
+  },
+  {
+    "id": "H92",
+    "type": "portfolio_logic",
+    "description": "Exact hedged weights on 2-stock [NEE 60, MSFT 40] -> [NEE 55, MSFT 45]",
+    "input": [
+      {
+        "ticker": "NEE",
+        "weight": 60
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 40
+      }
+    ],
+    "check": "exact_hedged_weights",
+    "expected": {
+      "NEE": 55.0,
+      "MSFT": 45.0
+    },
+    "requirement": "2-stock [60, 40] shifts exactly 5.0 pts to [55.0, 45.0]."
+  },
+  {
+    "id": "H93",
+    "type": "portfolio_logic",
+    "description": "Exact hedged weights on 2-stock [XOM 75, ORCL 25] -> [XOM 70, ORCL 30]",
+    "input": [
+      {
+        "ticker": "XOM",
+        "weight": 75
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 25
+      }
+    ],
+    "check": "exact_hedged_weights",
+    "expected": {
+      "XOM": 70.0,
+      "ORCL": 30.0
+    },
+    "requirement": "2-stock [75, 25] shifts exactly 5.0 pts to [70.0, 30.0]."
+  },
+  {
+    "id": "H94",
+    "type": "csv_parser",
+    "description": "Out-of-sample multi-class share ticker with dot separator (BRK.B)",
+    "input": "Ticker,Weight\nBRK.B,60\nMSFT,40",
+    "expected": [
+      {
+        "ticker": "BRK.B",
+        "weight": 60
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 40
+      }
+    ],
+    "requirement": "Known boundary limitation: standard regex ^[A-Za-z]{1,5} requires alphabetic symbols and skips dot-separated share classes (BRK.B)."
+  },
+  {
+    "id": "H95",
+    "type": "csv_parser",
+    "description": "Out-of-sample European-locale decimal comma formatting (50,5%)",
+    "input": "Ticker;Weight\nNVDA;50,5\nMSFT;49,5",
+    "expected": [
+      {
+        "ticker": "NVDA",
+        "weight": 50.5
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 49.5
+      }
+    ],
+    "requirement": "Known boundary limitation: CSV parser treats commas as column separators rather than European decimal radix points."
+  },
+  {
+    "id": "H96",
+    "type": "csv_parser",
+    "description": "Out-of-sample hyphenated share-class ticker (BF-B) in portfolio CSV",
+    "input": "Ticker,Weight\nBF-B,55\nMSFT,45",
+    "expected": [
+      {
+        "ticker": "BF-B",
+        "weight": 55
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 45
+      }
+    ],
+    "requirement": "Known boundary limitation: standard regex ^[A-Za-z]{1,5} requires alphabetic symbols and skips hyphenated share classes (BF-B)."
+  },
+  {
+    "id": "H97",
+    "type": "portfolio_logic",
+    "description": "Out-of-sample narrow-spread defensive pair [AAPL 50%, ORCL 50%] (-0.6% vs -0.5% drag) strict 3-metric improvement check",
+    "input": [
+      {
+        "ticker": "AAPL",
+        "weight": 50
+      },
+      {
+        "ticker": "ORCL",
+        "weight": 50
+      }
+    ],
+    "check": "metrics_improvement",
+    "expected": {
+      "unpriced_improved": true,
+      "sharpe_improved": true,
+      "mdd_improved": true
+    },
+    "requirement": "Known boundary limitation: across a narrow 0.1% hazard spread (-0.6% vs -0.5%), rotating 5.0 pts into ORCL lowers return enough that net Sharpe does not strictly increase."
+  },
+  {
+    "id": "H98",
+    "type": "portfolio_logic",
+    "description": "Out-of-sample low-dispersion defensive pair [ORCL 50%, MSFT 50%] strict Sharpe & drawdown improvement net of 18 bps execution drag",
+    "input": [
+      {
+        "ticker": "ORCL",
+        "weight": 50
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 50
+      }
+    ],
+    "check": "metrics_improvement",
+    "expected": {
+      "unpriced_improved": true,
+      "sharpe_improved": true,
+      "mdd_improved": true
+    },
+    "requirement": "Known boundary limitation: on a low-dispersion defensive pair (-0.5% vs -0.4% drag), the 18 bps turnover cost and baseline volatility prevent simultaneous improvement across all three metrics."
+  },
+  {
+    "id": "H99",
+    "type": "portfolio_logic",
+    "description": "Out-of-sample unmapped foreign ADR pair [ASML 40%, TSM 60%] evaluated in synchronous offline mode without live SEC/Gemini agent resolution",
+    "input": [
+      {
+        "ticker": "ASML",
+        "weight": 40
+      },
+      {
+        "ticker": "TSM",
+        "weight": 60
+      }
+    ],
+    "check": "directional_tilt",
+    "expected": {
+      "decrease": "TSM",
+      "increase": "ASML"
+    },
+    "requirement": "Known boundary limitation: in synchronous offline mode (without calling the async 5-step Agentic Research Loop), unmapped foreign ADRs rely on position-order fallback priors rather than live international fab geolocation."
+  },
+  {
+    "id": "H100",
+    "type": "csv_parser",
+    "description": "Out-of-sample raw dollar-notional CSV ($250000) exceeding percentage weight range (0, 100]",
+    "input": "Ticker,MarketValue\nNVDA,$250000\nMSFT,$250000",
+    "expected": [
+      {
+        "ticker": "NVDA",
+        "weight": 50
+      },
+      {
+        "ticker": "MSFT",
+        "weight": 50
+      }
+    ],
+    "requirement": "Known boundary limitation: CSV parser validates percentage allocations in (0, 100] and rejects raw dollar notional figures above 100."
   }
 ]

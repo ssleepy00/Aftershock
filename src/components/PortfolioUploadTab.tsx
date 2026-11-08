@@ -21,9 +21,17 @@ import React, { useState, useRef, useMemo } from 'react';
 import {
   StockRiskProfile,
   PORTFOLIO_PRESETS,
+  STOCK_DATABASE,
+  DYNAMIC_TICKER_PROFILES,
+  registerDynamicStockProfile,
   buildPortfolioProfiles,
   computePortfolioMetrics,
   verifyPortfolioGuardrails,
+  computeHoldingReasoningTraces,
+  evaluateStressScenario,
+  STRESS_SCENARIOS,
+  StressScenarioDefinition,
+  AgentStepTrace,
 } from '../data/aftershockData';
 import { logFunctionCall } from '../utils/logger';
 import {
@@ -39,6 +47,9 @@ import {
   Info,
   AlertTriangle,
   ShieldCheck,
+  Calculator,
+  Plus,
+  Zap,
 } from 'lucide-react';
 
 export interface PortfolioUploadTabProps {
@@ -74,6 +85,16 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
   const [activePresetId, setActivePresetId] = useState<string>('ai-cloud');
   const [showScoreTooltip, setShowScoreTooltip] = useState(false);
   const [pinnedScoreTooltip, setPinnedScoreTooltip] = useState(false);
+  const [expandedTraceTicker, setExpandedTraceTicker] = useState<string | null>(null);
+  const [selectedStressId, setSelectedStressId] =
+    useState<StressScenarioDefinition['id']>('baseline');
+  const [customTickerInput, setCustomTickerInput] = useState<string>('');
+  const [customWeightInput, setCustomWeightInput] = useState<string>('15');
+  const [isResolvingTicker, setIsResolvingTicker] = useState<boolean>(false);
+  const [latestAgentTrace, setLatestAgentTrace] = useState<{
+    ticker: string;
+    steps: AgentStepTrace[];
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Keep holdings sorted by highest danger / most negative unpriced risk first
@@ -87,6 +108,23 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
     () => verifyPortfolioGuardrails(sortedProfiles),
     [sortedProfiles]
   );
+  const reasoningTraces = useMemo(
+    () => computeHoldingReasoningTraces(sortedProfiles),
+    [sortedProfiles]
+  );
+  const stressEval = useMemo(
+    () => evaluateStressScenario(sortedProfiles, selectedStressId),
+    [sortedProfiles, selectedStressId]
+  );
+
+  const traceByTicker = useMemo(() => {
+    const map: Record<string, (typeof reasoningTraces)[number]> = {};
+    for (const t of reasoningTraces) {
+      map[t.ticker] = t;
+    }
+    return map;
+  }, [reasoningTraces]);
+
   const activeMetrics = isHedged ? metrics.hedged : metrics.current;
   const totalSites = sortedProfiles.reduce((sum, p) => sum + p.sites.length, 0);
 
@@ -104,6 +142,47 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
   );
   const scoreImprovement =
     metrics.current.exposureScore - metrics.hedged.exposureScore;
+
+  /**
+   * Resolves any unseen stock ticker symbol via `/api/portfolio/resolve-unseen-ticker`
+   * using the 5-step Agentic Stock Infrastructure Research & Verification Loop
+   * before building the portfolio profiles.
+   *
+   * @param items Raw ticker and weight items.
+   */
+  const resolveUnseenTickersAndBuild = async (
+    items: { ticker: string; weight: number }[]
+  ): Promise<StockRiskProfile[]> => {
+    logFunctionCall('resolveUnseenTickersAndBuild', { count: items.length });
+    const unseen = items
+      .map((i) => i.ticker.toUpperCase().trim())
+      .filter((t) => !STOCK_DATABASE[t] && !DYNAMIC_TICKER_PROFILES[t]);
+
+    if (unseen.length > 0) {
+      await Promise.all(
+        unseen.slice(0, 4).map(async (ticker) => {
+          try {
+            const resp = await fetch('/api/portfolio/resolve-unseen-ticker', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ticker }),
+            });
+            const data = await resp.json();
+            if (resp.ok && data?.profile) {
+              registerDynamicStockProfile(data.profile);
+              if (Array.isArray(data.agentTrace)) {
+                setLatestAgentTrace({ ticker, steps: data.agentTrace });
+              }
+            }
+          } catch {
+            // If offline or unconfigured, buildPortfolioProfiles uses deterministic fallback
+          }
+        })
+      );
+    }
+
+    return buildPortfolioProfiles(items);
+  };
 
   /**
    * Processes an uploaded file (screenshot, pie chart image, CSV, or text),
@@ -156,7 +235,8 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
       }
       if (data?.items && Array.isArray(data.items) && data.items.length > 0) {
         setPortfolioName(data.portfolioName || file.name.replace(/\.[^/.]+$/, ''));
-        setProfiles(buildPortfolioProfiles(data.items));
+        const built = await resolveUnseenTickersAndBuild(data.items);
+        setProfiles(built);
       } else {
         setUploadError('No valid portfolio tickers or weights detected in file.');
       }
@@ -165,6 +245,39 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
       setUploadError('Network error while extracting portfolio upload.');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  /**
+   * Adds any arbitrary (including unseen) stock ticker to the active portfolio,
+   * dynamically resolving its US facilities via Gemini if not already in the database.
+   *
+   * @param e Form submission event.
+   */
+  const handleAddCustomTicker = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+    const cleanTicker = customTickerInput.toUpperCase().trim().replace(/[^A-Z.]/g, '');
+    const weightVal = Number(customWeightInput) || 15;
+    if (!cleanTicker) return;
+
+    logFunctionCall('handleAddCustomTicker', { ticker: cleanTicker, weight: weightVal });
+    setIsResolvingTicker(true);
+    setUploadError(null);
+    setIsHumanApproved(false);
+
+    try {
+      const existingItems = sortedProfiles
+        .filter((p) => p.ticker !== cleanTicker)
+        .map((p) => ({ ticker: p.ticker, weight: p.weight }));
+      const combined = [...existingItems, { ticker: cleanTicker, weight: weightVal }];
+      const built = await resolveUnseenTickersAndBuild(combined);
+      setProfiles(built);
+      setCustomTickerInput('');
+      setExpandedTraceTicker(cleanTicker);
+    } catch (err: any) {
+      setUploadError(err?.message || `Failed to add ticker ${cleanTicker}`);
+    } finally {
+      setIsResolvingTicker(false);
     }
   };
 
@@ -196,6 +309,7 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
     setUploadedPreviewUrl(null);
     setUploadError(null);
     setIsHumanApproved(false);
+    setExpandedTraceTicker(null);
     setPortfolioName(found.label);
     setProfiles(buildPortfolioProfiles(found.items));
   };
@@ -344,6 +458,96 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
                 })}
               </div>
             </div>
+
+            {/* Live Unseen Ticker Tester (Out-of-Sample Equity Resolution) */}
+            <div className="mt-3.5 p-3.5 rounded-2xl bg-[#191410] border border-[#332820] space-y-2.5">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[#E57A54] uppercase tracking-wider">
+                    Out-of-Sample Unseen Ticker Tester
+                  </span>
+                  <span className="text-[10px] font-mono text-[#52B788] bg-[#52B788]/10 px-2 py-0.5 rounded-md border border-[#52B788]/30">
+                    Live SEC EDGAR + FEMA/USGS Agent
+                  </span>
+                </div>
+                <p className="text-[11px] text-[#A8988A] mt-1 leading-relaxed">
+                  Test any stock symbol outside the 14 pre-indexed equities (e.g., <code className="text-[#F7F2EB] font-mono">PLD</code>, <code className="text-[#F7F2EB] font-mono">VST</code>, <code className="text-[#F7F2EB] font-mono">TSM</code>). Clicking <strong>Agent Resolve</strong> triggers a 5-step agentic loop that queries live SEC EDGAR filings, geolocates 3 primary physical facilities, cross-references county-level FEMA NRI &amp; USGS seismic hazard tables, and runs deterministic waterfilling math to rebalance your portfolio.
+                </p>
+              </div>
+
+              <form
+                onSubmit={handleAddCustomTicker}
+                className="flex items-center gap-2 pt-1"
+              >
+                <input
+                  type="text"
+                  value={customTickerInput}
+                  onChange={(e) => setCustomTickerInput(e.target.value)}
+                  placeholder="Test unseen ticker (e.g. TSM, PLD, VST)"
+                  className="flex-1 min-w-0 bg-[#14100C] border border-[#382C24] rounded-xl px-3 py-1.5 text-xs text-[#F7F2EB] placeholder-[#7D6B5D] focus:outline-none focus:border-[#E57A54]"
+                />
+                <input
+                  type="number"
+                  min={1}
+                  max={90}
+                  value={customWeightInput}
+                  onChange={(e) => setCustomWeightInput(e.target.value)}
+                  className="w-14 bg-[#14100C] border border-[#382C24] rounded-xl px-2 py-1.5 text-xs font-mono text-center text-[#F7F2EB] focus:outline-none focus:border-[#E57A54]"
+                  title="Target allocation weight (%)"
+                />
+                <button
+                  type="submit"
+                  disabled={isResolvingTicker || !customTickerInput.trim()}
+                  className="px-3 py-1.5 rounded-xl bg-[#2E241D] hover:bg-[#3D3027] disabled:opacity-50 border border-[#4D3C31] text-xs font-bold text-[#E57A54] flex items-center gap-1 cursor-pointer shrink-0"
+                >
+                  {isResolvingTicker ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Plus className="w-3.5 h-3.5" />
+                  )}
+                  <span>Agent Resolve</span>
+                </button>
+              </form>
+            </div>
+
+            {/* Multi-Step Agentic Stock Research & Verification Loop Trace */}
+            {latestAgentTrace && (
+              <div className="mt-3 p-3 rounded-2xl bg-[#16110E] border border-[#3E3026] space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#E57A54]">
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#52B788]" />
+                    <span>
+                      5-Step Agentic Research Loop ({latestAgentTrace.ticker})
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLatestAgentTrace(null)}
+                    className="text-[10px] text-[#8C7A6B] hover:text-[#F7F2EB] cursor-pointer"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+                <div className="space-y-1.5">
+                  {latestAgentTrace.steps.map((step) => (
+                    <div
+                      key={step.stepNumber}
+                      className="p-2 rounded-xl bg-[#1F1814] border border-[#31261F] text-[10px]"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-[#F7F2EB]">
+                          {step.stepNumber}. {step.title}
+                        </span>
+                        <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-[#2B211B] text-[#52B788]">
+                          {step.toolName}
+                        </span>
+                      </div>
+                      <div className="text-[#A8988A] mt-0.5">{step.outputSummary}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Interactive Donut Preview Footer with Portfolio Exposure Score (/100) */}
@@ -546,13 +750,13 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
                       : 'Guardrail Check'}
                   </span>
                   <span className="px-2 py-0.5 rounded-lg bg-[#241C16] border border-[#382C24] font-mono text-[#D6C7B8]">
-                    Max Δw: {guardrailCheck.maxSingleStockDeltaPts.toFixed(1)}/5.0 pts
+                    Max Shift: {guardrailCheck.maxSingleStockDeltaPts.toFixed(1)}/5.0 pts
                   </span>
                   <span className="px-2 py-0.5 rounded-lg bg-[#241C16] border border-[#382C24] font-mono text-[#D6C7B8]">
                     Turnover: {guardrailCheck.oneWayTurnoverPct.toFixed(1)}%/15.0%
                   </span>
                   <span className="px-2 py-0.5 rounded-lg bg-[#241C16] border border-[#382C24] font-mono text-[#D6C7B8]">
-                    Σw: {guardrailCheck.hedgedWeightSumPct.toFixed(1)}%
+                    Total Weight: {guardrailCheck.hedgedWeightSumPct.toFixed(1)}%
                   </span>
                 </div>
 
@@ -580,6 +784,46 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
                 </button>
               </div>
             )}
+
+            {/* Interactive Physical Catastrophe Stress-Test Simulator */}
+            <div className="mt-3 p-3 rounded-2xl bg-[#191410] border border-[#31261F]">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#D6C7B8]">
+                  <Zap className="w-3.5 h-3.5 text-[#F4A261]" />
+                  <span>Catastrophe Stress Simulator:</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {STRESS_SCENARIOS.map((sc) => {
+                    const active = selectedStressId === sc.id;
+                    return (
+                      <button
+                        key={sc.id}
+                        onClick={() => setSelectedStressId(sc.id)}
+                        className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold transition-all cursor-pointer border ${
+                          active
+                            ? 'bg-[#E57A54]/20 border-[#E57A54] text-[#F7F2EB]'
+                            : 'bg-[#221B16] border-[#332820] text-[#9A897A] hover:text-[#F7F2EB]'
+                        }`}
+                      >
+                        {sc.shortLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {selectedStressId !== 'baseline' && (
+                <div className="mt-2 pt-2 border-t border-[#2C221B] flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                  <span className="text-[#A8988A]">
+                    <strong className="text-[#F7F2EB]">{stressEval.scenario.agencyReference}:</strong>{' '}
+                    Current Shock <strong className="font-mono text-[#F25C54]">{stressEval.currentShockLossPct}%</strong> → Hedged Shock{' '}
+                    <strong className="font-mono text-[#52B788]">{stressEval.hedgedShockLossPct}%</strong>
+                  </span>
+                  <span className="px-2 py-0.5 rounded-lg bg-[#52B788]/15 text-[#52B788] font-mono font-bold">
+                    +{stressEval.netShockProtectionBps} bps tail protection
+                  </span>
+                </div>
+              )}
+            </div>
 
             {/* Quantitative Metrics Strip (Normal on Current Weights, New + Difference on Risk-Hedged) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 my-4">
@@ -665,100 +909,180 @@ export const PortfolioUploadTab: React.FC<PortfolioUploadTabProps> = ({
                 const uniqueCategories = Array.from(
                   new Set(stock.sites.map((s) => s.category))
                 ).join(' · ');
+                const trace = traceByTicker[stock.ticker];
+                const isTraceOpen = expandedTraceTicker === stock.ticker;
 
                 return (
                   <div
                     key={stock.ticker}
-                    onClick={() => onGoToMap(stock.ticker)}
-                    className="group p-3 rounded-2xl bg-[#1A1410] hover:bg-[#281F19] border border-[#31261F] hover:border-[#4D3C31] transition-all cursor-pointer flex items-center justify-between gap-4"
+                    className="rounded-2xl bg-[#1A1410] border border-[#31261F] hover:border-[#4D3C31] transition-all overflow-hidden"
                   >
-                    {/* Left: Rank + Ticker + Company + Threat Badge */}
-                    <div className="flex items-center gap-3 min-w-[200px]">
-                      <span className="font-mono text-[11px] font-bold text-[#7D6B5D] w-4">
-                        #{rankIdx + 1}
-                      </span>
-                      <div
-                        className="w-9 h-9 rounded-2xl flex items-center justify-center font-mono text-xs font-extrabold text-[#16110E] shrink-0"
-                        style={{ backgroundColor: stock.color }}
-                      >
-                        {stock.ticker}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-[#F7F2EB]">
-                            {stock.company}
-                          </span>
-                          <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                              isHurricane
-                                ? 'bg-[#F4A261]/15 text-[#F4A261]'
-                                : 'bg-[#E57A54]/15 text-[#E57A54]'
-                            }`}
-                          >
-                            {isHurricane ? (
-                              <Waves className="w-2.5 h-2.5" />
-                            ) : (
-                              <Flame className="w-2.5 h-2.5" />
-                            )}
-                            {stock.primaryHazard}
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-[#9A897A] mt-0.5">
-                          Score <strong className="text-[#D6C7B8] font-mono">{stock.exposureScore}/100</strong> · {uniqueCategories}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Middle: Allocation Bar */}
-                    <div className="flex-1 max-w-[200px] hidden sm:block">
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-[#9A897A]">
-                          {isHedged ? 'Hedged' : 'Current'}
+                    <div
+                      onClick={() => onGoToMap(stock.ticker)}
+                      className="p-3 hover:bg-[#281F19] transition-all cursor-pointer flex items-center justify-between gap-4"
+                    >
+                      {/* Left: Rank + Ticker + Company + Threat Badge */}
+                      <div className="flex items-center gap-3 min-w-[200px]">
+                        <span className="font-mono text-[11px] font-bold text-[#7D6B5D] w-4">
+                          #{rankIdx + 1}
                         </span>
-                        <div className="flex items-center gap-1.5 font-mono">
-                          <span className="font-bold text-[#F7F2EB] tabular-nums">
-                            {displayWeight.toFixed(1)}%
-                          </span>
-                          {isHedged && weightDiff !== 0 && (
+                        <div
+                          className="w-9 h-9 rounded-2xl flex items-center justify-center font-mono text-xs font-extrabold text-[#16110E] shrink-0"
+                          style={{ backgroundColor: stock.color }}
+                        >
+                          {stock.ticker}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-[#F7F2EB]">
+                              {stock.company}
+                            </span>
                             <span
-                              className={`text-[10px] font-semibold ${
-                                weightDiff > 0 ? 'text-[#52B788]' : 'text-[#F4A261]'
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                isHurricane
+                                  ? 'bg-[#F4A261]/15 text-[#F4A261]'
+                                  : 'bg-[#E57A54]/15 text-[#E57A54]'
                               }`}
                             >
-                              ({weightDiff > 0 ? `+${weightDiff}%` : `${weightDiff}%`})
+                              {isHurricane ? (
+                                <Waves className="w-2.5 h-2.5" />
+                              ) : (
+                                <Flame className="w-2.5 h-2.5" />
+                              )}
+                              {stock.primaryHazard}
                             </span>
-                          )}
+                          </div>
+                          <div className="text-[11px] text-[#9A897A] mt-0.5">
+                            Score <strong className="text-[#D6C7B8] font-mono">{stock.exposureScore}/100</strong> · {uniqueCategories}
+                          </div>
                         </div>
                       </div>
-                      <div className="h-2 rounded-full bg-[#2A201A] overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${Math.min(100, displayWeight * 2.5)}%`,
-                            backgroundColor: stock.color,
+
+                      {/* Middle: Allocation Bar */}
+                      <div className="flex-1 max-w-[190px] hidden sm:block">
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="text-[#9A897A]">
+                            {isHedged ? 'Hedged' : 'Current'}
+                          </span>
+                          <div className="flex items-center gap-1.5 font-mono">
+                            <span className="font-bold text-[#F7F2EB] tabular-nums">
+                              {displayWeight.toFixed(1)}%
+                            </span>
+                            {isHedged && weightDiff !== 0 && (
+                              <span
+                                className={`text-[10px] font-semibold ${
+                                  weightDiff > 0 ? 'text-[#52B788]' : 'text-[#F4A261]'
+                                }`}
+                              >
+                                ({weightDiff > 0 ? `+${weightDiff}%` : `${weightDiff}%`})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="h-2 rounded-full bg-[#2A201A] overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                              width: `${Math.min(100, displayWeight * 2.5)}%`,
+                              backgroundColor: stock.color,
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Right: Trace Math Button + Unpriced Risk % in Red */}
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedTraceTicker(
+                              isTraceOpen ? null : stock.ticker
+                            );
                           }}
-                        />
+                          className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                            isTraceOpen
+                              ? 'bg-[#E57A54] border-[#E57A54] text-[#16110E]'
+                              : 'bg-[#241C16] border-[#3D3027] text-[#D6C7B8] hover:border-[#E57A54]'
+                          }`}
+                          title="Inspect verifiable math & facility rollup behind this stock's recommendation"
+                        >
+                          <Calculator className="w-3 h-3" />
+                          <span>Trace Math</span>
+                        </button>
+
+                        <div className="text-right">
+                          <div className="inline-flex items-center px-3 py-1 rounded-xl bg-[#F25C54]/15 border border-[#F25C54]/30 font-mono text-sm font-bold text-[#F25C54] tabular-nums">
+                            {stock.unpricedRiskPct.toFixed(1)}%
+                          </div>
+                          <div className="text-[10px] text-[#8C7A6B] mt-0.5">
+                            unpriced risk
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Right: Unpriced Risk % in Red */}
-                    <div className="text-right shrink-0">
-                      <div className="inline-flex items-center px-3 py-1 rounded-xl bg-[#F25C54]/15 border border-[#F25C54]/30 font-mono text-sm font-bold text-[#F25C54] tabular-nums">
-                        {stock.unpricedRiskPct.toFixed(1)}%
+                    {/* Expandable Traceable Reasoning & Calculation Audit Drawer */}
+                    {isTraceOpen && trace && (
+                      <div className="px-4 py-3.5 bg-[#14100C] border-t border-[#2E241D] text-xs space-y-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-bold text-[#E57A54] flex items-center gap-1.5">
+                            <Calculator className="w-3.5 h-3.5" />
+                            Traceable Calculation Audit — {stock.ticker} ({stock.company})
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-lg font-mono text-[10px] font-bold ${
+                              trace.classification === 'OVER_EXPOSED_TRIM'
+                                ? 'bg-[#F4A261]/15 text-[#F4A261]'
+                                : trace.classification === 'RESILIENT_BUFFER_ADD'
+                                ? 'bg-[#52B788]/15 text-[#52B788]'
+                                : 'bg-[#2E241D] text-[#B5A698]'
+                            }`}
+                          >
+                            {trace.classification} · Priority Share: {trace.prioritySharePct}%
+                          </span>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-[#1C1612] border border-[#2E241D] font-mono text-[11px] text-[#D6C7B8] space-y-1">
+                          <div>
+                            <strong className="text-[#F7F2EB]">1. Facility Hazard Rollup:</strong>{' '}
+                            {trace.facilityRollupFormula}
+                          </div>
+                          <div>
+                            <strong className="text-[#F7F2EB]">2. Bounded Waterfilling Hedge:</strong>{' '}
+                            {trace.hedgeAllocationFormula}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          {trace.siteContributions.map((sc) => (
+                            <div
+                              key={sc.siteName}
+                              className="p-2 rounded-xl bg-[#1C1612] border border-[#2C221B] text-[11px]"
+                            >
+                              <div className="font-bold text-[#F7F2EB] truncate">
+                                {sc.siteName}
+                              </div>
+                              <div className="text-[#9A897A] text-[10px]">
+                                {sc.location} · {sc.category} ({sc.hazard})
+                              </div>
+                              <div className="mt-1 font-mono text-[10px] text-[#F4A261]">
+                                Impact: {sc.unpricedImpactPct}% ({sc.shareOfStockRiskPct}% of stock drag · +{sc.categoryPointsEarned} score pts)
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="text-[10px] text-[#8C7A6B] mt-0.5">
-                        unpriced risk
-                      </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           </div>
 
-          {/* Bottom Summary Bar (Cleaned up per user request) */}
+          {/* Bottom Summary Bar */}
           <div className="mt-4 pt-3.5 border-t border-[#332820] flex items-center justify-between text-xs text-[#A8988A]">
-            <span>Sorted by highest unpriced disaster risk · Click any stock to inspect US sites</span>
+            <span>Sorted by highest unpriced disaster risk · Click &quot;Trace Math&quot; to verify equations or click any stock to inspect US sites</span>
           </div>
         </div>
       </div>

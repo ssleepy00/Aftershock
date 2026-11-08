@@ -17,6 +17,26 @@
  * 4. Error Tracing & Warning Diagnostics: Formats unexpected runtime exceptions and fallback events.
  */
 
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  type: 'FUNCTION_CALL' | 'GENAI_CALL';
+  name: string;
+  summary: string;
+}
+
+const RECENT_AUDIT_LOGS: AuditLogEntry[] = [];
+const MAX_AUDIT_LOGS = 60;
+
+/**
+ * Returns a copy of the most recent structured function and GenAI audit log entries.
+ *
+ * @returns Array of recent AuditLogEntry objects (newest first).
+ */
+export function getRecentAuditLogs(): AuditLogEntry[] {
+  return [...RECENT_AUDIT_LOGS];
+}
+
 /**
  * Strips raw base64 or heavy binary inlineData payloads from prompt parts before logging.
  *
@@ -60,6 +80,17 @@ export function logFunctionCall(functionName: string, params: Record<string, any
 
   try {
     const serialized = JSON.stringify(params);
+    RECENT_AUDIT_LOGS.unshift({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      timestamp: new Date().toISOString().slice(11, 23),
+      type: 'FUNCTION_CALL',
+      name: functionName,
+      summary: serialized.slice(0, 220),
+    });
+    if (RECENT_AUDIT_LOGS.length > MAX_AUDIT_LOGS) {
+      RECENT_AUDIT_LOGS.pop();
+    }
+
     if (hasNodeStderr) {
       process.stderr.write(`${msg} ${serialized}\n`);
     } else {
@@ -95,5 +126,18 @@ export function logGenAiCall(meta: {
     output: meta.output,
     error: meta.error ? String(meta.error) : undefined,
   };
+  RECENT_AUDIT_LOGS.unshift({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    timestamp: new Date().toISOString().slice(11, 23),
+    type: 'GENAI_CALL',
+    name: meta.model,
+    summary: JSON.stringify({
+      output: meta.output ? meta.output.slice(0, 140) : undefined,
+      error: meta.error,
+    }),
+  });
+  if (RECENT_AUDIT_LOGS.length > MAX_AUDIT_LOGS) {
+    RECENT_AUDIT_LOGS.pop();
+  }
   console.info('[INFO] GenAI Call Executed:', JSON.stringify(logPayload, null, 2));
 }

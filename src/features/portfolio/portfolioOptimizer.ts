@@ -18,10 +18,39 @@
  * 4. Sorting & Formatting: Sorts output profiles deterministically by unpriced risk severity.
  */
 
-import { StockRiskProfile } from './types';
-import { STOCK_DATABASE } from './stockDatabase';
-import { CONFIG } from '../../config/appConfig';
-import { logFunctionCall } from '../../utils/logger';
+import type { StockRiskProfile } from './types.ts';
+import { STOCK_DATABASE } from './stockDatabase.ts';
+import { CONFIG } from '../../config/appConfig.ts';
+import { logFunctionCall } from '../../utils/logger.ts';
+
+/**
+ * Runtime registry of dynamically resolved unseen equity profiles (populated via live Gemini grounding).
+ */
+export const DYNAMIC_TICKER_PROFILES: Record<
+  string,
+  Omit<StockRiskProfile, 'weight' | 'hedgedWeight'>
+> = {};
+
+/**
+ * Registers a dynamically resolved unseen stock profile into the runtime database
+ * so subsequent calls to `buildPortfolioProfiles` incorporate its real-world facilities and hazard metrics.
+ *
+ * @param profile Resolved stock risk profile (excluding portfolio-specific weights).
+ */
+export function registerDynamicStockProfile(
+  profile: Omit<StockRiskProfile, 'weight' | 'hedgedWeight'>
+): void {
+  const cleanTicker = profile.ticker.toUpperCase().trim();
+  logFunctionCall('registerDynamicStockProfile', {
+    ticker: cleanTicker,
+    company: profile.company,
+    sitesCount: profile.sites.length,
+  });
+  DYNAMIC_TICKER_PROFILES[cleanTicker] = {
+    ...profile,
+    ticker: cleanTicker,
+  };
+}
 
 /**
  * Waterfilling bounded allocator that distributes a target reallocation sum across
@@ -90,26 +119,47 @@ export function buildPortfolioProfiles(
 
   const validItems = rawItems.filter((item) => Number(item.weight) > 0);
   const sourceItems = validItems.length > 0 ? validItems : rawItems;
+
+  // Aggregate duplicate ticker symbols while preserving first-seen order
+  const mergedMap = new Map<string, number>();
+  for (const item of sourceItems) {
+    const clean = item.ticker.toUpperCase().trim();
+    if (!clean) continue;
+    mergedMap.set(clean, (mergedMap.get(clean) || 0) + (Number(item.weight) || 0));
+  }
+  const mergedItems = Array.from(mergedMap.entries()).map(([ticker, weight]) => ({
+    ticker,
+    weight,
+  }));
+
   const total =
-    sourceItems.reduce((acc, item) => acc + (Number(item.weight) || 0), 0) || 100;
+    mergedItems.reduce((acc, item) => acc + (Number(item.weight) || 0), 0) || 100;
 
   // Normalize initial weights and ensure exact 100.0% sum
-  const normalized = sourceItems.map((item) => ({
-    ticker: item.ticker.toUpperCase().trim(),
+  const normalized = mergedItems.map((item) => ({
+    ticker: item.ticker,
     weight: Number(((Number(item.weight) / total) * 100).toFixed(1)),
   }));
   if (normalized.length > 0) {
-    const normSum = Number(
+    let normSum = Number(
       normalized.reduce((s, x) => s + x.weight, 0).toFixed(1)
     );
-    const diff = Number((100.0 - normSum).toFixed(1));
-    if (Math.abs(diff) > 0 && Math.abs(diff) <= 0.5) {
-      normalized[0].weight = Number((normalized[0].weight + diff).toFixed(1));
+    let steps = Math.round((100.0 - normSum) * 10);
+    let idx = 0;
+    while (steps !== 0 && idx < normalized.length * 4) {
+      const target = normalized[idx % normalized.length];
+      const stepVal = steps > 0 ? 0.1 : -0.1;
+      if (target.weight + stepVal >= 0.1) {
+        target.weight = Number((target.weight + stepVal).toFixed(1));
+        steps += steps > 0 ? -1 : 1;
+      }
+      idx++;
     }
   }
 
   const profiles: StockRiskProfile[] = normalized.map((item, idx) => {
-    const known = STOCK_DATABASE[item.ticker];
+    const known =
+      STOCK_DATABASE[item.ticker] || DYNAMIC_TICKER_PROFILES[item.ticker];
     if (known) {
       return {
         ...known,
@@ -194,8 +244,11 @@ export function buildPortfolioProfiles(
   const MAX_ONE_WAY_TURNOVER = CONFIG.RISK_GUARDRAILS.MAX_ONE_WAY_TURNOVER;
 
   const severities = profiles.map((p) => Math.abs(p.unpricedRiskPct));
-  const meanSeverity =
+  const rawMean =
     severities.reduce((a, b) => a + b, 0) / (severities.length || 1);
+  const minSev = severities.length > 0 ? Math.min(...severities) : 0;
+  const maxSev = severities.length > 0 ? Math.max(...severities) : 0;
+  const meanSeverity = 0.5 * (rawMean + 0.5 * (minSev + maxSev));
 
   const highIdx: number[] = [];
   const lowIdx: number[] = [];
@@ -237,38 +290,70 @@ export function buildPortfolioProfiles(
       );
     });
 
-    // Reconcile 0.1% rounding drift without violating the 5.0-pt cap or 15.0% turnover
-    const hedgedSum = Number(
+    // Reconcile 0.1% rounding drift so sum(hedgedWeight) == 100.0% and turnover <= 15.0%
+    let hedgedSum = Number(
       profiles.reduce((s, p) => s + p.hedgedWeight, 0).toFixed(1)
     );
-    const residual = Number((100.0 - hedgedSum).toFixed(1));
-    if (Math.abs(residual) > 0 && Math.abs(residual) <= 0.5) {
+    let residualSteps = Math.round((100.0 - hedgedSum) * 10);
+    let guardIter = 0;
+    while (residualSteps !== 0 && guardIter < profiles.length * 6) {
+      const stepVal = residualSteps > 0 ? 0.1 : -0.1;
+      let adjusted = false;
       for (const p of profiles) {
-        const candidate = Number((p.hedgedWeight + residual).toFixed(1));
-        const delta = Math.abs(candidate - p.weight);
+        const candidate = Number((p.hedgedWeight + stepVal).toFixed(1));
+        const currentDelta = Math.abs(p.hedgedWeight - p.weight);
+        const newDelta = Math.abs(candidate - p.weight);
         if (
           candidate >= 0 &&
           candidate <= 100 &&
-          delta <= MAX_DELTA_PER_STOCK + 1e-6
+          newDelta <= MAX_DELTA_PER_STOCK + 1e-6 &&
+          newDelta <= currentDelta + 1e-6
         ) {
-          const testProfiles = profiles.map((x) =>
-            x === p ? { ...x, hedgedWeight: candidate } : x
-          );
-          const testTurnover = Number(
-            (
-              0.5 *
-              testProfiles.reduce(
-                (sum, x) => sum + Math.abs(x.hedgedWeight - x.weight),
-                0
-              )
-            ).toFixed(1)
-          );
-          if (testTurnover <= MAX_ONE_WAY_TURNOVER) {
+          p.hedgedWeight = candidate;
+          residualSteps += residualSteps > 0 ? -1 : 1;
+          adjusted = true;
+          break;
+        }
+      }
+      if (!adjusted) {
+        for (const p of profiles) {
+          const candidate = Number((p.hedgedWeight + stepVal).toFixed(1));
+          const newDelta = Math.abs(candidate - p.weight);
+          if (
+            candidate >= 0 &&
+            candidate <= 100 &&
+            newDelta <= MAX_DELTA_PER_STOCK + 1e-6
+          ) {
             p.hedgedWeight = candidate;
+            residualSteps += residualSteps > 0 ? -1 : 1;
             break;
           }
         }
       }
+      guardIter++;
+    }
+
+    // Ensure 1-decimal rounding never pushes one-way turnover above MAX_ONE_WAY_TURNOVER
+    let currentTurnover = Number(
+      (
+        0.5 *
+        profiles.reduce((sum, x) => sum + Math.abs(x.hedgedWeight - x.weight), 0)
+      ).toFixed(1)
+    );
+    let trimIter = 0;
+    while (currentTurnover > MAX_ONE_WAY_TURNOVER + 1e-6 && trimIter < 10) {
+      const trimmedStock = profiles.find((p) => p.hedgedWeight < p.weight - 0.05);
+      const addedStock = profiles.find((p) => p.hedgedWeight > p.weight + 0.05);
+      if (!trimmedStock || !addedStock) break;
+      trimmedStock.hedgedWeight = Number((trimmedStock.hedgedWeight + 0.1).toFixed(1));
+      addedStock.hedgedWeight = Number((addedStock.hedgedWeight - 0.1).toFixed(1));
+      currentTurnover = Number(
+        (
+          0.5 *
+          profiles.reduce((sum, x) => sum + Math.abs(x.hedgedWeight - x.weight), 0)
+        ).toFixed(1)
+      );
+      trimIter++;
     }
   }
 
